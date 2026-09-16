@@ -37,10 +37,10 @@ export default function ContactoPage() {
 
   const { mutate, isPending } = useMutation({
     mutationFn: () => api.post('/support/contacto', form),
-    onSuccess: () => {
+    onSuccess: (res) => {
       setForm(FORM_INICIAL);
       setErrors({});
-      toast({ title: '✅ Mensaje enviado', description: 'Te responderemos pronto' });
+      toast({ title: '✅ Mensaje enviado', description: `Código ${res.data.codigo} · Te enviamos una constancia en PDF a tu correo` });
     },
     onError: (e: any) => {
       const msg = e?.response?.data?.message;

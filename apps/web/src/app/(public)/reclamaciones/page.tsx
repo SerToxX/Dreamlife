@@ -81,10 +81,10 @@ export default function ReclamacionesPage() {
       descripcion: form.descripcion,
       pedido: form.pedido,
     }),
-    onSuccess: () => {
+    onSuccess: (res) => {
       setForm(FORM_INICIAL);
       setErrors({});
-      toast({ title: '✅ Reclamación registrada', description: 'Te responderemos en 30 días hábiles según Ley 29571' });
+      toast({ title: '✅ Reclamación registrada', description: `Código ${res.data.codigo} · Te enviamos tu constancia en PDF a tu correo` });
     },
     onError: (e: any) => {
       const msg = e?.response?.data?.message;
