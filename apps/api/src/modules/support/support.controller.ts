@@ -69,4 +69,12 @@ export class SupportController {
     res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="${file.filename}"` });
     res.send(file.buffer);
   }
+
+  // Genera los PDF de los registros que existían antes de esta función (uso
+  // único desde el panel admin, no reenvía correos)
+  @Post('backfill-pdfs')
+  @UseGuards(AuthGuard('jwt'), RolesGuard) @Roles('admin')
+  backfillPdfs() {
+    return this.service.backfillPdfs();
+  }
 }

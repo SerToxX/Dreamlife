@@ -1,9 +1,10 @@
 'use client';
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { FileText, MessageSquare, Download, Eye, Loader2 } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { FileText, MessageSquare, Download, Eye, Loader2, RefreshCw } from 'lucide-react';
 import api from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { formatDate } from '@/lib/utils';
 import { toast } from '@/components/ui/toaster';
 import { AdminPageHeader } from '@/components/shared/admin-page-header';
@@ -11,11 +12,30 @@ import { AdminPageHeader } from '@/components/shared/admin-page-header';
 type Tab = 'contactos' | 'reclamos';
 
 export default function PdfsPage() {
+  const qc = useQueryClient();
   const [tab, setTab] = useState<Tab>('contactos');
   const [cargando, setCargando] = useState<string | null>(null);
+  const [generando, setGenerando] = useState(false);
 
   const { data: contactos } = useQuery({ queryKey: ['pdfs-contactos'], queryFn: () => api.get('/support/contactos').then((r) => r.data) });
   const { data: reclamos } = useQuery({ queryKey: ['pdfs-reclamos'], queryFn: () => api.get('/support/reclamaciones').then((r) => r.data) });
+
+  const generarPendientes = async () => {
+    setGenerando(true);
+    try {
+      const { data } = await api.post('/support/backfill-pdfs');
+      qc.invalidateQueries({ queryKey: ['pdfs-contactos'] });
+      qc.invalidateQueries({ queryKey: ['pdfs-reclamos'] });
+      toast({
+        title: data.generados > 0 ? `✅ ${data.generados} PDF generado(s)` : 'Todo al día',
+        description: data.generados > 0 ? 'Los registros antiguos ya tienen su constancia disponible' : 'No había PDFs pendientes por generar',
+      });
+    } catch {
+      toast({ title: 'No se pudo generar', description: 'Intenta de nuevo en un momento', variant: 'destructive' });
+    } finally {
+      setGenerando(false);
+    }
+  };
 
   const abrirPdf = async (tipo: Tab, id: number, modo: 'ver' | 'descargar') => {
     const key = `${tipo}-${id}-${modo}`;
@@ -49,8 +69,12 @@ export default function PdfsPage() {
 
   return (
     <div>
-      <div className="mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
         <AdminPageHeader icon={<FileText className="w-5 h-5" />} title="PDFs" subtitle="Constancias generadas de contacto y libro de reclamaciones" gradient="blue" />
+        <Button size="sm" variant="outline" className="gap-1.5" onClick={generarPendientes} disabled={generando}>
+          {generando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+          {generando ? 'Generando...' : 'Generar PDFs pendientes'}
+        </Button>
       </div>
 
       <div className="flex gap-2 mb-4 border-b border-border">

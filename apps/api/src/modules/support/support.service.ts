@@ -153,4 +153,30 @@ export class SupportService {
   marcarLeido(id: number) {
     return this.prisma.contacto.update({ where: { id }, data: { leido: true } });
   }
+
+  // Genera el PDF de registros creados ANTES de que existiera esta función
+  // (pdf IS NULL). No reenvía correos — es solo para llenar el archivo del
+  // panel admin con lo histórico.
+  async backfillPdfs() {
+    const [reclamos, contactos] = await Promise.all([
+      this.prisma.reclamacion.findMany({ where: { pdf: null } }),
+      this.prisma.contacto.findMany({ where: { pdf: null } }),
+    ]);
+
+    let generados = 0;
+    for (const r of reclamos) {
+      const codigo = `${r.tipo}-${String(r.id).padStart(6, '0')}`;
+      const pdf = await this.pdf.generateReclamacionPdf({ ...r, codigo, fecha: r.createdAt });
+      await this.prisma.reclamacion.update({ where: { id: r.id }, data: { pdf } });
+      generados++;
+    }
+    for (const c of contactos) {
+      const codigo = `CONTACTO-${String(c.id).padStart(6, '0')}`;
+      const pdf = await this.pdf.generateContactoPdf({ ...c, codigo, fecha: c.createdAt });
+      await this.prisma.contacto.update({ where: { id: c.id }, data: { pdf } });
+      generados++;
+    }
+
+    return { generados, reclamos: reclamos.length, contactos: contactos.length };
+  }
 }
