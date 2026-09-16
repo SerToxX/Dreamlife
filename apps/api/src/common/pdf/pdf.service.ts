@@ -1,4 +1,6 @@
 import { Injectable } from '@nestjs/common';
+import * as path from 'path';
+import * as fs from 'fs';
 import PDFDocument = require('pdfkit');
 
 interface ReclamacionPdfData {
@@ -27,11 +29,14 @@ interface ContactoPdfData {
   mensaje: string;
 }
 
+const LOGO_PATH = path.join(process.cwd(), 'assets', 'logo-icon.png');
+const MARGIN = 50;
+
 @Injectable()
 export class PdfService {
   private build(draw: (doc: PDFKit.PDFDocument) => void): Promise<Buffer> {
     return new Promise((resolve) => {
-      const doc = new PDFDocument({ size: 'A4', margins: { top: 50, bottom: 50, left: 50, right: 50 } });
+      const doc = new PDFDocument({ size: 'A4', margins: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN } });
       const chunks: Buffer[] = [];
       doc.on('data', (c: Buffer) => chunks.push(c));
       doc.on('end', () => resolve(Buffer.concat(chunks)));
@@ -40,127 +45,183 @@ export class PdfService {
     });
   }
 
-  private header(doc: PDFKit.PDFDocument, badge: string) {
-    doc.rect(0, 0, doc.page.width, 90).fill('#111111');
-    doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(20).text('DREAM LIFE', 50, 28);
-    doc.font('Helvetica').fontSize(9).fillColor('#cccccc').text('dreamlifeperu.com', 50, 53);
-    const badgeText = badge.toUpperCase();
-    doc.font('Helvetica-Bold').fontSize(9);
-    const badgeWidth = doc.widthOfString(badgeText) + 24;
-    doc.roundedRect(doc.page.width - 50 - badgeWidth, 30, badgeWidth, 22, 11).fill('#ffffff');
-    doc.fillColor('#111111').font('Helvetica-Bold').fontSize(9).text(badgeText, doc.page.width - 50 - badgeWidth, 37, { width: badgeWidth, align: 'center' });
-    doc.fillColor('#111111');
-    doc.x = 50;
-    doc.y = 112;
+  private contentWidth(doc: PDFKit.PDFDocument) {
+    return doc.page.width - MARGIN * 2;
   }
 
-  private codeBox(doc: PDFKit.PDFDocument, codigo: string, fecha: Date) {
+  // ── Encabezado centrado: logo + marca + subtítulo + razón social/RUC ──
+  private header(doc: PDFKit.PDFDocument, subtitulo: string) {
+    const width = this.contentWidth(doc);
+    let y = MARGIN;
+    const hasLogo = fs.existsSync(LOGO_PATH);
+    const logoSize = 46;
+
+    if (hasLogo) {
+      doc.image(LOGO_PATH, doc.page.width / 2 - logoSize / 2, y, { width: logoSize, height: logoSize });
+      y += logoSize + 10;
+    }
+
+    doc.fillColor('#000000').font('Helvetica-Bold').fontSize(26).text('DREAM LIFE', MARGIN, y, { width, align: 'center' });
+    y = doc.y + 6;
+    doc.font('Helvetica-Bold').fontSize(14).fillColor('#333333').text(subtitulo, MARGIN, y, { width, align: 'center' });
+    y = doc.y + 8;
+
+    const razon = process.env.COMPANY_RAZON_SOCIAL || 'Dream Life';
+    const ruc = process.env.COMPANY_RUC || 'Por completar';
+    doc.font('Helvetica').fontSize(9).fillColor('#666666').text(`Razón Social: ${razon}   |   RUC: ${ruc}`, MARGIN, y, { width, align: 'center' });
+    y = doc.y + 16;
+
+    doc.moveTo(MARGIN, y).lineTo(doc.page.width - MARGIN, y).lineWidth(2).strokeColor('#000000').stroke();
+    doc.y = y + 22;
+    doc.x = MARGIN;
+  }
+
+  // ── Fila "Código de Reclamo" / "Fecha de Registro" (o equivalente) ──
+  private codeRow(doc: PDFKit.PDFDocument, codigoLabel: string, codigo: string, fecha: Date) {
+    const width = this.contentWidth(doc);
+    const half = width / 2;
     const y = doc.y;
-    doc.roundedRect(50, y, doc.page.width - 100, 46, 6).fill('#f5f5f5');
-    doc.fillColor('#6b6b6b').font('Helvetica').fontSize(8).text('CÓDIGO', 65, y + 9);
-    doc.fillColor('#111111').font('Helvetica-Bold').fontSize(13).text(codigo, 65, y + 21);
     const fechaTexto = fecha.toLocaleString('es-PE', { dateStyle: 'medium', timeStyle: 'short' });
-    doc.fillColor('#6b6b6b').font('Helvetica').fontSize(8).text('FECHA DE REGISTRO', 290, y + 9, { width: 235, align: 'right' });
-    doc.fillColor('#111111').font('Helvetica-Bold').fontSize(13).text(fechaTexto, 290, y + 21, { width: 235, align: 'right' });
-    doc.x = 50;
-    doc.y = y + 46 + 24;
+
+    doc.font('Helvetica-Bold').fontSize(10).fillColor('#000000').text(`${codigoLabel}: `, MARGIN, y, { continued: true, width: half });
+    doc.font('Helvetica').fillColor('#333333').text(codigo);
+
+    doc.font('Helvetica-Bold').fontSize(10).fillColor('#000000').text('Fecha de Registro: ', MARGIN + half, y, { continued: true, width: half });
+    doc.font('Helvetica').fillColor('#333333').text(fechaTexto);
+
+    doc.y = Math.max(doc.y, y + 16) + 18;
+    doc.x = MARGIN;
   }
 
   private sectionTitle(doc: PDFKit.PDFDocument, title: string) {
-    doc.x = 50;
-    doc.fillColor('#111111').font('Helvetica-Bold').fontSize(11).text(title, 50, doc.y, { width: doc.page.width - 100 });
-    const y = doc.y + 3;
-    doc.moveTo(50, y).lineTo(doc.page.width - 50, y).strokeColor('#111111').lineWidth(1).stroke();
+    const width = this.contentWidth(doc);
+    doc.x = MARGIN;
+    doc.fillColor('#000000').font('Helvetica-Bold').fontSize(12).text(title, MARGIN, doc.y, { width });
+    const y = doc.y + 6;
+    doc.moveTo(MARGIN, y).lineTo(doc.page.width - MARGIN, y).lineWidth(1.5).strokeColor('#000000').stroke();
     doc.y = y + 12;
-    doc.x = 50;
+    doc.x = MARGIN;
   }
 
-  private row(doc: PDFKit.PDFDocument, label: string, value: string) {
+  // ── Fila de tabla: celda de etiqueta con fondo gris + celda de valor, ambas con borde ──
+  private tableRow(doc: PDFKit.PDFDocument, label: string, value: string) {
+    const width = this.contentWidth(doc);
+    const labelWidth = Math.round(width * 0.3);
+    const valueWidth = width - labelWidth;
+    const pad = 9;
+    const texto = value?.trim() || '—';
+
+    doc.font('Helvetica').fontSize(9.5);
+    const valueHeight = doc.heightOfString(texto, { width: valueWidth - pad * 2 });
+    const rowHeight = Math.max(30, valueHeight + pad * 2);
     const y = doc.y;
-    doc.font('Helvetica').fontSize(9).fillColor('#6b6b6b').text(label, 50, y, { width: 140 });
-    const afterLabelY = doc.y;
-    doc.font('Helvetica').fontSize(10).fillColor('#111111').text(value || '—', 200, y, { width: doc.page.width - 250 });
-    doc.x = 50;
-    doc.y = Math.max(afterLabelY, doc.y) + 6;
+
+    if (y + rowHeight > doc.page.height - MARGIN) {
+      doc.addPage();
+      doc.y = MARGIN;
+      return this.tableRow(doc, label, value);
+    }
+
+    doc.rect(MARGIN, y, labelWidth, rowHeight).fillAndStroke('#f5f5f5', '#dddddd');
+    doc.rect(MARGIN + labelWidth, y, valueWidth, rowHeight).lineWidth(1).strokeColor('#dddddd').stroke();
+
+    doc.font('Helvetica-Bold').fontSize(9.5).fillColor('#000000').text(label, MARGIN + pad, y + pad, { width: labelWidth - pad * 2 });
+    doc.font('Helvetica').fontSize(9.5).fillColor('#222222').text(texto, MARGIN + labelWidth + pad, y + pad, { width: valueWidth - pad * 2 });
+
+    doc.x = MARGIN;
+    doc.y = y + rowHeight;
   }
 
-  private block(doc: PDFKit.PDFDocument, label: string, value: string) {
-    doc.x = 50;
-    doc.font('Helvetica').fontSize(9).fillColor('#6b6b6b').text(label, { width: doc.page.width - 100 });
-    doc.y += 2;
-    doc.font('Helvetica').fontSize(10).fillColor('#111111').text(value, 50, doc.y, { width: doc.page.width - 100, lineGap: 2 });
-    doc.y += 12;
+  // ── Bloque de texto largo con caja gris clara (descripción, pedido, mensaje) ──
+  private textBlock(doc: PDFKit.PDFDocument, label: string, value: string) {
+    const width = this.contentWidth(doc);
+    doc.x = MARGIN;
+    doc.font('Helvetica-Bold').fontSize(10.5).fillColor('#000000').text(label, MARGIN, doc.y, { width });
+    doc.y += 7;
+
+    const pad = 12;
+    doc.font('Helvetica').fontSize(9.5);
+    const textHeight = doc.heightOfString(value, { width: width - pad * 2 });
+    const boxHeight = Math.max(50, textHeight + pad * 2);
+    const y = doc.y;
+
+    if (y + boxHeight > doc.page.height - MARGIN) {
+      doc.addPage();
+      doc.y = MARGIN;
+      return this.textBlock(doc, label, value);
+    }
+
+    doc.rect(MARGIN, y, width, boxHeight).fillAndStroke('#fafafa', '#dddddd');
+    doc.font('Helvetica').fontSize(9.5).fillColor('#222222').text(value, MARGIN + pad, y + pad, { width: width - pad * 2 });
+
+    doc.x = MARGIN;
+    doc.y = y + boxHeight + 16;
   }
 
-  private footer(doc: PDFKit.PDFDocument, texto: string) {
-    doc.x = 50;
-    doc.y += 8;
-    doc.moveTo(50, doc.y).lineTo(doc.page.width - 50, doc.y).strokeColor('#e5e5e5').stroke();
-    doc.y += 10;
-    doc.font('Helvetica').fontSize(8).fillColor('#9a9a9a').text(texto, 50, doc.y, { width: doc.page.width - 100, lineGap: 2 });
+  private footer(doc: PDFKit.PDFDocument, parrafos: string[]) {
+    const width = this.contentWidth(doc);
+    doc.x = MARGIN;
+    doc.y += 6;
+    doc.moveTo(MARGIN, doc.y).lineTo(doc.page.width - MARGIN, doc.y).lineWidth(2).strokeColor('#000000').stroke();
+    doc.y += 14;
+    parrafos.forEach((p) => {
+      doc.font('Helvetica').fontSize(8).fillColor('#666666').text(p, MARGIN, doc.y, { width, lineGap: 2 });
+      doc.y += 8;
+    });
   }
 
   async generateReclamacionPdf(data: ReclamacionPdfData): Promise<Buffer> {
     return this.build((doc) => {
-      this.header(doc, data.tipo === 'QUEJA' ? 'Queja' : 'Reclamo');
-      doc.fillColor('#111111').font('Helvetica-Bold').fontSize(16).text(
-        data.tipo === 'QUEJA' ? 'CONSTANCIA DE QUEJA' : 'CONSTANCIA DE RECLAMO',
-        50,
-        doc.y,
-      );
-      doc.y += 16;
-      this.codeBox(doc, data.codigo, data.fecha);
+      const esQueja = data.tipo === 'QUEJA';
+      this.header(doc, 'LIBRO DE RECLAMACIONES');
+      this.codeRow(doc, esQueja ? 'Código de Queja' : 'Código de Reclamo', data.codigo, data.fecha);
 
       this.sectionTitle(doc, '1. Datos del consumidor');
-      this.row(doc, 'Nombre', data.nombre);
-      this.row(doc, 'Documento', `${data.tipoDocumento} ${data.documento}`);
-      this.row(doc, 'Correo', data.correo);
-      this.row(doc, 'Teléfono', data.telefono || '—');
-      this.row(doc, 'Domicilio', data.direccion || '—');
-      doc.y += 6;
+      this.tableRow(doc, 'Nombre', data.nombre);
+      this.tableRow(doc, 'Tipo de Documento', data.tipoDocumento);
+      this.tableRow(doc, 'Número de Documento', data.documento);
+      this.tableRow(doc, 'Teléfono', data.telefono || '');
+      this.tableRow(doc, 'Correo Electrónico', data.correo);
+      this.tableRow(doc, 'Dirección', data.direccion || '');
+      doc.y += 14;
 
       this.sectionTitle(doc, '2. Identificación del bien contratado');
-      this.row(doc, 'Producto / servicio', data.detalleBien || '—');
-      this.row(doc, 'Monto reclamado', data.monto != null && data.monto !== '' ? `S/. ${data.monto}` : '—');
-      doc.y += 6;
+      this.tableRow(doc, 'Producto / Servicio', data.detalleBien || '');
+      this.tableRow(doc, 'Monto Reclamado', data.monto != null && data.monto !== '' ? `S/. ${data.monto}` : '');
+      this.tableRow(doc, 'Tipo de Registro', esQueja ? 'Queja' : 'Reclamo');
+      doc.y += 14;
 
-      this.sectionTitle(doc, '3. Detalle de la reclamación');
-      this.block(doc, 'Descripción de los hechos', data.descripcion);
-      this.block(doc, 'Pedido del consumidor', data.pedido);
+      this.sectionTitle(doc, '3. Detalle del reclamo');
+      this.textBlock(doc, 'Descripción de los Hechos:', data.descripcion);
+      this.textBlock(doc, 'Petitorio (Solución Solicitada):', data.pedido);
 
-      this.footer(
-        doc,
-        'El proveedor debe dar respuesta a este reclamo/queja en un plazo no mayor a treinta (30) días calendario, ' +
-          'conforme al Código de Protección y Defensa del Consumidor (Ley 29571) y su reglamento (D.S. 011-2011-PCM). ' +
-          'La formulación de este reclamo no impide acudir a otras vías de solución de controversias ni es requisito ' +
-          'previo para interponer una denuncia ante el INDECOPI. Este documento constituye constancia de la ' +
-          'presentación del reclamo/queja conforme a la normativa vigente. Generado automáticamente por dreamlifeperu.com.',
-      );
+      this.footer(doc, [
+        'El proveedor debe dar respuesta a este reclamo/queja en un plazo no mayor a treinta (30) días calendario, conforme al Código de Protección y Defensa del Consumidor (Ley 29571) y su reglamento (D.S. 011-2011-PCM).',
+        'La formulación de este reclamo no impide acudir a otras vías de solución de controversias ni es requisito previo para interponer una denuncia ante el INDECOPI.',
+        'Este documento ha sido generado automáticamente y constituye constancia de la presentación del reclamo/queja conforme a la normativa vigente.',
+      ]);
     });
   }
 
   async generateContactoPdf(data: ContactoPdfData): Promise<Buffer> {
     return this.build((doc) => {
-      this.header(doc, 'Contacto');
-      doc.fillColor('#111111').font('Helvetica-Bold').fontSize(16).text('CONSTANCIA DE MENSAJE ENVIADO', 50, doc.y);
-      doc.y += 16;
-      this.codeBox(doc, data.codigo, data.fecha);
+      this.header(doc, 'CONSTANCIA DE CONTACTO');
+      this.codeRow(doc, 'Código', data.codigo, data.fecha);
 
       this.sectionTitle(doc, '1. Datos del remitente');
-      this.row(doc, 'Nombre', data.nombre);
-      this.row(doc, 'Correo', data.correo);
-      this.row(doc, 'Teléfono', data.telefono || '—');
-      this.row(doc, 'Asunto', data.asunto?.trim() || 'Sin asunto');
-      doc.y += 6;
+      this.tableRow(doc, 'Nombre', data.nombre);
+      this.tableRow(doc, 'Correo Electrónico', data.correo);
+      this.tableRow(doc, 'Teléfono', data.telefono || '');
+      this.tableRow(doc, 'Asunto', data.asunto?.trim() || 'Sin asunto');
+      doc.y += 14;
 
       this.sectionTitle(doc, '2. Mensaje');
-      this.block(doc, 'Contenido', data.mensaje);
+      this.textBlock(doc, 'Contenido:', data.mensaje);
 
-      this.footer(
-        doc,
-        'Este documento es una constancia del mensaje enviado a través del formulario de contacto de ' +
-          'dreamlifeperu.com. Te responderemos a la brevedad al correo indicado. Generado automáticamente.',
-      );
+      this.footer(doc, [
+        'Este documento es una constancia del mensaje enviado a través del formulario de contacto de dreamlifeperu.com.',
+        'Te responderemos a la brevedad al correo indicado. Documento generado automáticamente.',
+      ]);
     });
   }
 }

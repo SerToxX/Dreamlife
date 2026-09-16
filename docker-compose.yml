@@ -48,6 +48,8 @@ services:
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
       CONTACT_EMAIL_TO: ${CONTACT_EMAIL_TO:-}
+      COMPANY_RAZON_SOCIAL: ${COMPANY_RAZON_SOCIAL:-Dream Life}
+      COMPANY_RUC: ${COMPANY_RUC:-}
     ports:
       - "3001:3001"
     depends_on:

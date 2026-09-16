@@ -27,6 +27,7 @@ ENV NODE_ENV=production
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/assets ./assets
 COPY --from=builder /app/package.json ./
 
 RUN mkdir -p uploads backups
