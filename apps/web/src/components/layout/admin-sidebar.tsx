@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
-import { LayoutDashboard, Package, Warehouse, ShoppingBag, Users, BarChart2, DollarSign, Tag, Monitor, LogOut, Sparkles, MessageSquare, FolderTree, MapPin, Store, ShieldCheck, DatabaseBackup } from 'lucide-react';
+import { LayoutDashboard, Package, Warehouse, ShoppingBag, Users, BarChart2, DollarSign, Tag, Monitor, LogOut, Sparkles, MessageSquare, FolderTree, MapPin, Store, ShieldCheck, DatabaseBackup, FileText } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth.store';
 import { cn } from '@/lib/utils';
 import { toast } from '@/components/ui/toaster';
@@ -24,6 +24,7 @@ const LINKS = [
   { href: '/backups', label: 'Backups', icon: DatabaseBackup, roles: ['admin'] },
   { href: '/marketing', label: 'Marketing', icon: Tag, roles: ['admin'] },
   { href: '/soporte', label: 'Soporte', icon: MessageSquare, roles: ['admin'] },
+  { href: '/pdfs', label: 'PDFs', icon: FileText, roles: ['admin'] },
 ];
 
 export function AdminSidebar() {

@@ -701,6 +701,7 @@ model Reclamacion {
   pedido        String   @db.Text
   estado        String   @default("PENDIENTE") @db.VarChar(30)
   respuesta     String?  @db.Text
+  pdf           Bytes?   @db.LongBlob
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -715,6 +716,7 @@ model Contacto {
   asunto    String   @db.VarChar(200)
   mensaje   String   @db.Text
   leido     Boolean  @default(false)
+  pdf       Bytes?   @db.LongBlob
   createdAt DateTime @default(now())
 
   @@map("contacto")

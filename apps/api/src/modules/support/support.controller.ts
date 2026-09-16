@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Patch, Body, Param, ParseIntPipe, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, ParseIntPipe, UseGuards, Res, NotFoundException } from '@nestjs/common';
+import type { Response } from 'express';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { Throttle } from '@nestjs/throttler';
@@ -33,6 +34,15 @@ export class SupportController {
     return this.service.updateReclamacion(id, body);
   }
 
+  @Get('reclamaciones/:id/pdf')
+  @UseGuards(AuthGuard('jwt'), RolesGuard) @Roles('admin')
+  async getReclamacionPdf(@Param('id', ParseIntPipe) id: number, @Res() res: Response) {
+    const file = await this.service.getReclamacionPdf(id);
+    if (!file) throw new NotFoundException('El PDF de esta reclamación aún no está disponible');
+    res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="${file.filename}"` });
+    res.send(file.buffer);
+  }
+
   // ── Contacto ──
   @Public() @Throttle({ default: { limit: 5, ttl: 60000 } }) @Post('contacto')
   createContacto(@Body() body: any) {
@@ -49,5 +59,14 @@ export class SupportController {
   @UseGuards(AuthGuard('jwt'), RolesGuard) @Roles('admin')
   marcarLeido(@Param('id', ParseIntPipe) id: number) {
     return this.service.marcarLeido(id);
+  }
+
+  @Get('contactos/:id/pdf')
+  @UseGuards(AuthGuard('jwt'), RolesGuard) @Roles('admin')
+  async getContactoPdf(@Param('id', ParseIntPipe) id: number, @Res() res: Response) {
+    const file = await this.service.getContactoPdf(id);
+    if (!file) throw new NotFoundException('El PDF de este mensaje aún no está disponible');
+    res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename="${file.filename}"` });
+    res.send(file.buffer);
   }
 }

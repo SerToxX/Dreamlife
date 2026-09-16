@@ -71,8 +71,11 @@ export class SupportService {
     };
 
     // Ley 29571 / D.S. 011-2011-PCM: el consumidor debe recibir copia de su
-    // hoja de reclamación, y la empresa debe conservar la suya.
+    // hoja de reclamación, y la empresa debe conservar la suya. El PDF también
+    // se guarda en la BD (no en el filesystem del contenedor) para que quede
+    // disponible en el panel admin y sobreviva a los redeploys.
     this.pdf.generateReclamacionPdf({ ...mailData, codigo, fecha: reclamacion.createdAt }).then((pdf) => {
+      this.prisma.reclamacion.update({ where: { id: reclamacion.id }, data: { pdf } }).catch(() => {});
       this.mail.sendReclamacionNotification(mailData, pdf);
       this.mail.sendReclamacionConstancia(mailData, pdf, codigo);
     });
@@ -81,7 +84,15 @@ export class SupportService {
   }
 
   listReclamaciones() {
-    return this.prisma.reclamacion.findMany({ orderBy: { createdAt: 'desc' } });
+    // Sin el campo `pdf` (puede pesar cientos de KB por fila) — la lista del
+    // panel admin no lo necesita, solo la descarga individual.
+    return this.prisma.reclamacion.findMany({ orderBy: { createdAt: 'desc' }, omit: { pdf: true } });
+  }
+
+  async getReclamacionPdf(id: number) {
+    const r = await this.prisma.reclamacion.findUnique({ where: { id }, select: { pdf: true, tipo: true } });
+    if (!r?.pdf) return null;
+    return { buffer: r.pdf, filename: `reclamo-${String(id).padStart(6, '0')}.pdf` };
   }
 
   updateReclamacion(id: number, data: any) {
@@ -109,6 +120,7 @@ export class SupportService {
     };
 
     this.pdf.generateContactoPdf({ ...mailData, codigo, fecha: contacto.createdAt }).then((pdf) => {
+      this.prisma.contacto.update({ where: { id: contacto.id }, data: { pdf } }).catch(() => {});
       this.mail.sendContactoNotification(mailData, pdf);
       this.mail.sendContactoConstancia(mailData, pdf, codigo);
     });
@@ -117,7 +129,13 @@ export class SupportService {
   }
 
   listContactos() {
-    return this.prisma.contacto.findMany({ orderBy: { createdAt: 'desc' } });
+    return this.prisma.contacto.findMany({ orderBy: { createdAt: 'desc' }, omit: { pdf: true } });
+  }
+
+  async getContactoPdf(id: number) {
+    const c = await this.prisma.contacto.findUnique({ where: { id }, select: { pdf: true } });
+    if (!c?.pdf) return null;
+    return { buffer: c.pdf, filename: `contacto-${String(id).padStart(6, '0')}.pdf` };
   }
 
   marcarLeido(id: number) {
