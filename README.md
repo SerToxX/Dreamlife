@@ -24,11 +24,6 @@ Sistema completo: **Tienda online + Panel admin + POS** para tienda de merchandi
 ## 🚀 Instalación local (Docker)
 
 ```bash
-# 0. Solo la primera vez: crear la red externa "coolify" (el compose la
-#    referencia para producción; en local no la usa para nada, pero debe
-#    existir para que "docker compose up" no falle)
-docker network create coolify
-
 # 1. Levantar todos los servicios
 docker compose up -d --build
 

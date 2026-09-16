@@ -58,7 +58,6 @@ services:
       - api_backups:/app/backups
     networks:
       - dreamlife
-      - coolify
 
   # ── Frontend Next.js ───────────────────────────────────
   web:
@@ -80,7 +79,6 @@ services:
       - api
     networks:
       - dreamlife
-      - coolify
 
 volumes:
   mysql_data:
@@ -90,5 +88,3 @@ volumes:
 networks:
   dreamlife:
     driver: bridge
-  coolify:
-    external: true
