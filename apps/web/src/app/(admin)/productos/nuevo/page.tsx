@@ -2,8 +2,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useQuery, useMutation } from '@tanstack/react-query';
-import { ArrowLeft, Save, MapPin, Plus, Trash2 } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { ArrowLeft, Save, MapPin, Plus, Trash2, Image as ImageIcon } from 'lucide-react';
 import api from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,15 +14,22 @@ interface StockRow { ubicacionId: number; cantidad: number; }
 
 export default function NuevoProductoPage() {
   const router = useRouter();
+  const qc = useQueryClient();
   const [form, setForm] = useState({
     nombre: '', descripcion: '', precioBase: '',
     categoriaId: '', destacado: false, imagen: '',
-    sku: '', tamano: 'M', material: 'Algodón',
+    sku: '', tamano: '', material: '',
   });
   const [stocks, setStocks] = useState<StockRow[]>([]);
 
   const { data: cats } = useQuery({ queryKey: ['cats'], queryFn: () => api.get('/categories').then((r) => r.data) });
   const { data: ubicaciones } = useQuery({ queryKey: ['ubicaciones'], queryFn: () => api.get('/inventory/ubicaciones').then((r) => r.data) });
+
+  // ── Igual que en la edición: la categoría decide si "Talla" tiene sentido.
+  const categoriaActual = cats?.find((c: any) => String(c.id) === form.categoriaId);
+  const nombreCategoria = (categoriaActual?.nombre ?? '').toLowerCase();
+  const esRopa = /camiset|polo|hoodie|sudadera|casaca|chompa|buzo|pantal[oó]n|short|abrigo|chaqueta|ropa|prenda|talla/.test(nombreCategoria);
+  const TALLAS = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'Única'];
 
   const addStockRow = () => {
     const usadas = new Set(stocks.map((s) => s.ubicacionId));
@@ -65,7 +72,7 @@ export default function NuevoProductoPage() {
       }
       return prod;
     },
-    onSuccess: () => { toast({ title: '✅ Producto creado' }); router.push('/productos'); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-products'] }); toast({ title: '✅ Producto creado' }); router.push('/productos'); },
     onError: (e: any) => toast({ title: 'Error', description: e.response?.data?.message?.toString(), variant: 'destructive' }),
   });
 
@@ -86,7 +93,12 @@ export default function NuevoProductoPage() {
         </div>
         <div>
           <label className="text-xs text-muted-foreground mb-1.5 block">URL Imagen (opcional)</label>
-          <Input placeholder="https://..." value={form.imagen} onChange={(e) => setForm((p) => ({ ...p, imagen: e.target.value }))} />
+          <div className="flex gap-3 items-start">
+            <div className="w-16 h-16 rounded-md bg-secondary flex-shrink-0 overflow-hidden flex items-center justify-center border border-border">
+              {form.imagen ? <img src={form.imagen} alt="" className="w-full h-full object-cover" onError={(e) => (e.currentTarget.style.display = 'none')} /> : <ImageIcon className="w-5 h-5 text-muted-foreground" />}
+            </div>
+            <Input placeholder="https://..." value={form.imagen} onChange={(e) => setForm((p) => ({ ...p, imagen: e.target.value }))} className="flex-1" />
+          </div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
@@ -116,8 +128,15 @@ export default function NuevoProductoPage() {
             <Input placeholder="Ej: CAM-NRT-M-001" value={form.sku} onChange={(e) => setForm((p) => ({ ...p, sku: e.target.value }))} />
           </div>
           <div>
-            <label className="text-xs text-muted-foreground mb-1.5 block">Talla / Tamaño</label>
-            <Input value={form.tamano} onChange={(e) => setForm((p) => ({ ...p, tamano: e.target.value }))} />
+            <label className="text-xs text-muted-foreground mb-1.5 block">{esRopa ? 'Talla' : 'Variante (opcional)'}</label>
+            {esRopa ? (
+              <select className="h-10 w-full bg-input border border-border rounded-md px-3 text-sm" value={form.tamano} onChange={(e) => setForm((p) => ({ ...p, tamano: e.target.value }))}>
+                <option value="">Selecciona talla</option>
+                {TALLAS.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            ) : (
+              <Input placeholder="Ej: Negro, 350ml, Edición limitada" value={form.tamano} onChange={(e) => setForm((p) => ({ ...p, tamano: e.target.value }))} />
+            )}
           </div>
           <div>
             <label className="text-xs text-muted-foreground mb-1.5 block">Material</label>
@@ -147,7 +166,7 @@ export default function NuevoProductoPage() {
         </CardContent></Card>
       )}
 
-      <Button size="lg" className="gap-2 w-full sm:w-auto" disabled={!form.nombre || !form.precioBase || isPending} onClick={() => mutate()}>
+      <Button variant="gradient" size="lg" className="gap-2 w-full sm:w-auto" disabled={!form.nombre || !form.precioBase || isPending} onClick={() => mutate()}>
         <Save className="w-4 h-4" />{isPending ? 'Guardando...' : 'Crear producto'}
       </Button>
     </div>

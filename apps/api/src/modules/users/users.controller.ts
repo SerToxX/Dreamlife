@@ -12,6 +12,8 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 @Controller('users')
 export class UsersController {
   constructor(private service: UsersService) {}
+
+  @Get('roles') getRoles() { return this.service.getRoles(); }
   @Get() findAll() { return this.service.findAll(); }
   @Get(':id') findOne(@Param('id', ParseIntPipe) id: number) { return this.service.findOne(id); }
   @Post() create(@Body() body: any) { return this.service.create(body); }

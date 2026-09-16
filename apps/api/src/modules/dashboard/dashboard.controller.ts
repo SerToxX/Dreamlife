@@ -37,4 +37,9 @@ export class DashboardController {
   getRevenueByChannel(@Query('periodo') periodo?: string) {
     return this.service.getRevenueByChannel(periodo || 'mes');
   }
+
+  @Get('stock-health')
+  getStockHealth() {
+    return this.service.getStockHealth();
+  }
 }

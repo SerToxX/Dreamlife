@@ -36,8 +36,10 @@ model Usuario {
   ventas      Venta[]
   auditorias  Auditoria[]
   gastos      Gasto[]
+  ingresos    Ingreso[]
   ajustes     AjusteStock[]
   refreshTokens RefreshToken[]
+  backups     Backup[]
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 
@@ -59,7 +61,7 @@ model Cliente {
   id          Int                   @id @default(autoincrement())
   nombre      String                @db.VarChar(100)
   apellido    String?               @db.VarChar(100)
-  dni         String?               @db.VarChar(20)
+  dni         String?               @unique @db.VarChar(20)
   correo      String                @unique @db.VarChar(100)
   telefono    String?               @db.VarChar(20)
   direccion   String?               @db.Text
@@ -200,6 +202,7 @@ model Ubicacion {
   cajas              Caja[]
   ventas             Venta[]
   gastos             Gasto[]
+  ingresos           Ingreso[]
   movimientosOrigen  MovimientoStock[] @relation("StockOrigen")
   movimientosDestino MovimientoStock[] @relation("StockDestino")
 
@@ -296,9 +299,17 @@ model Venta {
   total       Decimal        @db.Decimal(10, 2)
   descuento   Decimal        @default(0) @db.Decimal(10, 2)
   notas       String?        @db.Text
+  // Datos del comprador al momento de la compra (snapshot para la boleta/factura
+  // y requeridos por la pasarela de pago — no cambian si el cliente edita su perfil después).
+  nombreComprador    String? @db.VarChar(150)
+  correoComprador    String? @db.VarChar(100)
+  telefonoComprador  String? @db.VarChar(20)
+  tipoDocumento      String? @db.VarChar(20)
+  numeroDocumento    String? @db.VarChar(20)
   detalles    VentaDetalle[]
   pagos       Pago[]
   envios      Envio[]
+  pedidosPersonalizados PedidoPersonalizado[]
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 
@@ -356,6 +367,10 @@ model Envio {
   tracking     String?   @db.VarChar(100)
   estado       String?   @db.VarChar(50)
   direccion    String?   @db.Text
+  distrito     String?   @db.VarChar(100)
+  provincia    String?   @db.VarChar(100)
+  departamento String?   @db.VarChar(100)
+  referencia   String?   @db.Text
   fechaEnvio   DateTime?
   fechaEntrega DateTime?
   createdAt    DateTime  @default(now())
@@ -430,9 +445,25 @@ model Gasto {
   descripcion String?    @db.Text
   monto       Decimal    @db.Decimal(10, 2)
   categoria   String?    @db.VarChar(50)
+  fecha       DateTime   @default(now())
   createdAt   DateTime   @default(now())
 
   @@map("gasto")
+}
+
+model Ingreso {
+  id          Int        @id @default(autoincrement())
+  ubicacionId Int?
+  ubicacion   Ubicacion? @relation(fields: [ubicacionId], references: [id])
+  usuarioId   Int?
+  usuario     Usuario?   @relation(fields: [usuarioId], references: [id])
+  descripcion String?    @db.Text
+  monto       Decimal    @db.Decimal(10, 2)
+  categoria   String?    @db.VarChar(50)
+  fecha       DateTime   @default(now())
+  createdAt   DateTime   @default(now())
+
+  @@map("ingreso")
 }
 
 // ─────────────────────────────────────────────
@@ -559,17 +590,50 @@ model ProductoInsumo {
 // ─────────────────────────────────────────────
 
 model PedidoPersonalizado {
-  id             Int      @id @default(autoincrement())
-  clienteId      Int
-  cliente        Cliente  @relation(fields: [clienteId], references: [id])
-  descripcion    String   @db.Text
-  imagenUrl      String?  @db.Text
-  estado         String   @default("PENDIENTE") @db.VarChar(50)
-  precioEstimado Decimal? @db.Decimal(10, 2)
-  notas          String?  @db.Text
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id                    Int      @id @default(autoincrement())
+  clienteId             Int
+  cliente               Cliente  @relation(fields: [clienteId], references: [id])
+  // Agrupa varias solicitudes personalizadas enviadas juntas (ej. 2 camisetas +
+  // 1 taza en un mismo envío) para poder cotizarlas y pagarlas como un solo pedido,
+  // igual que se paga un carrito con varios productos del catálogo.
+  grupoId               String?  @db.VarChar(40)
+  tipo                  String   @default("Personalizado") @db.VarChar(50)
+  descripcion           String   @db.Text
+  referencias           String?  @db.Text
+  imagenUrl             String?  @db.LongText
+  estado                String   @default("PENDIENTE") @db.VarChar(50)
+  precioEstimado        Decimal? @db.Decimal(10, 2)
+  // @db.LongText (no @db.Text): el diseño de la taza incluye el JSON completo
+  // del canvas, que si tiene una imagen cargada por el cliente embebe esa
+  // imagen en base64 ahí también — fácilmente supera el límite de 64KB de un
+  // TEXT normal de MySQL, lo que causaba un error 500 al enviar la solicitud.
+  notas                 String?  @db.LongText
+  notasInternas         String?  @db.Text
+  historialCotizaciones Json?
+  pagado                Boolean  @default(false)
+  metodoPago            String?  @db.VarChar(50)
+  pagadoEn              DateTime?
+  // Datos de facturación y envío, capturados al momento del pago (mismo
+  // formato que usa el checkout del catálogo — ver Venta/Envio).
+  nombreComprador       String?  @db.VarChar(150)
+  correoComprador       String?  @db.VarChar(100)
+  telefonoComprador     String?  @db.VarChar(20)
+  tipoDocumento         String?  @db.VarChar(20)
+  numeroDocumento       String?  @db.VarChar(20)
+  direccionEnvio        String?  @db.Text
+  distrito              String?  @db.VarChar(100)
+  provincia             String?  @db.VarChar(100)
+  departamento          String?  @db.VarChar(100)
+  referenciaEnvio       String?  @db.Text
+  // Cuando se paga, se genera una Venta real (con su propio código/#id) para
+  // que el pedido quede en el mismo sistema que las compras del catálogo —
+  // necesario para poder hacer una reclamación referenciando un N° de pedido.
+  ventaId               Int?
+  venta                 Venta?   @relation(fields: [ventaId], references: [id])
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
+  @@index([grupoId])
   @@map("pedido_personalizado")
 }
 
@@ -604,15 +668,35 @@ model Auditoria {
   @@map("auditoria")
 }
 
+// Copias de seguridad de la base de datos, generadas y descargadas solo por admin.
+// El nombre del archivo en disco lo genera el servidor (nunca el cliente), y las
+// operaciones de descarga/borrado siempre resuelven el archivo por este id, no
+// por una ruta que venga del navegador (evita path traversal).
+model Backup {
+  id          Int      @id @default(autoincrement())
+  archivo     String   @db.VarChar(255)
+  tamanoBytes Int
+  usuarioId   Int
+  usuario     Usuario  @relation(fields: [usuarioId], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@map("backup")
+}
+
 model Reclamacion {
   id            Int      @id @default(autoincrement())
   tipo          String   @db.VarChar(50)  // RECLAMO | QUEJA
   nombre        String   @db.VarChar(150)
+  tipoDocumento String   @default("DNI") @db.VarChar(20)
   documento     String   @db.VarChar(20)
   correo        String   @db.VarChar(150)
   telefono      String?  @db.VarChar(20)
   direccion     String?  @db.VarChar(300)
+  menorEdad          Boolean @default(false)
+  apoderadoNombre    String? @db.VarChar(150)
+  apoderadoDocumento String? @db.VarChar(20)
   detalleBien   String?  @db.Text
+  monto         Decimal? @db.Decimal(10, 2)
   descripcion   String   @db.Text
   pedido        String   @db.Text
   estado        String   @default("PENDIENTE") @db.VarChar(30)

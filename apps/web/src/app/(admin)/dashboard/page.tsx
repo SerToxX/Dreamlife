@@ -2,10 +2,15 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { ShoppingBag, Users, Package, AlertTriangle, TrendingUp, DollarSign, TrendingDown, ArrowUpRight, ArrowDownRight, Store } from 'lucide-react';
+import { ShoppingBag, Users, Package, AlertTriangle, TrendingUp, DollarSign, TrendingDown, Store, Warehouse, LayoutDashboard } from 'lucide-react';
+import {
+  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+  PieChart, Pie, Cell,
+} from 'recharts';
 import api from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { AdminPageHeader } from '@/components/shared/admin-page-header';
 import { formatPrice, cn } from '@/lib/utils';
 
 type Periodo = 'hoy' | 'semana' | 'mes' | 'anio';
@@ -17,6 +22,17 @@ const PERIODOS: { id: Periodo; label: string; chartLabel: string }[] = [
   { id: 'anio', label: 'Año', chartLabel: 'últimos 12 meses' },
 ];
 
+const PIE_COLORS = ['#dc2626', '#f97316', '#eab308', '#0891b2', '#7c3aed', '#db2777', '#16a34a', '#64748b'];
+const CANAL_LABEL: Record<string, string> = { ONLINE: 'Online', TIENDA: 'Tienda', EVENTO: 'Evento' };
+
+const tooltipStyle = {
+  background: 'hsl(var(--card))',
+  border: '1px solid hsl(var(--border))',
+  borderRadius: 8,
+  fontSize: 12,
+  color: 'hsl(var(--foreground))',
+};
+
 export default function DashboardPage() {
   const [periodo, setPeriodo] = useState<Periodo>('semana');
 
@@ -24,7 +40,7 @@ export default function DashboardPage() {
     queryKey: ['dash-sum', periodo],
     queryFn: () => api.get('/dashboard/summary', { params: { periodo } }).then((r) => r.data),
   });
-  const { data: chart } = useQuery({
+  const { data: chart, isLoading: loadingChart } = useQuery({
     queryKey: ['dash-chart', periodo],
     queryFn: () => api.get('/dashboard/sales-chart', { params: { periodo } }).then((r) => r.data),
   });
@@ -39,6 +55,10 @@ export default function DashboardPage() {
   const { data: revChan } = useQuery({
     queryKey: ['dash-rev-chan', periodo],
     queryFn: () => api.get('/dashboard/revenue-by-channel', { params: { periodo } }).then((r) => r.data),
+  });
+  const { data: stockHealth } = useQuery({
+    queryKey: ['dash-stock-health'],
+    queryFn: () => api.get('/dashboard/stock-health').then((r) => r.data),
   });
 
   const periodoActual = PERIODOS.find((p) => p.id === periodo)!;
@@ -56,13 +76,18 @@ export default function DashboardPage() {
     { label: 'Alertas stock', value: summary?.alertasStock ?? 0, sub: 'bajo mínimo', icon: AlertTriangle, color: (summary?.alertasStock ?? 0) > 0 ? 'text-accent' : '' },
   ];
 
+  const canalData = (revChan ?? []).map((r: any) => ({ name: CANAL_LABEL[r.canal] ?? r.canal, value: r.monto }));
+  const expCatData = (expCat ?? []).map((c: any) => ({ name: c.categoria, value: c.monto }));
+  const stockData = stockHealth ? [
+    { name: 'Saludable', value: stockHealth.ok, color: '#16a34a' },
+    { name: 'Stock bajo', value: stockHealth.bajo, color: '#eab308' },
+    { name: 'Agotado', value: stockHealth.agotado, color: '#dc2626' },
+  ].filter((d) => d.value > 0) : [];
+
   return (
     <div>
       <div className="flex items-start justify-between mb-6 flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Dashboard</h1>
-          <p className="text-muted-foreground text-sm mt-1">Resumen del negocio · {periodoActual.chartLabel}</p>
-        </div>
+        <AdminPageHeader icon={<LayoutDashboard className="w-5 h-5" />} title="Dashboard" subtitle={`Resumen del negocio · ${periodoActual.chartLabel}`} gradient="brand" />
         <Link href="/">
           <Button variant="outline" size="sm" className="gap-2">
             <Store className="w-4 h-4" />Ir a la tienda
@@ -95,22 +120,38 @@ export default function DashboardPage() {
 
       {/* Gráfica ingresos vs egresos */}
       <Card className="mb-4">
-        <CardHeader className="pb-2 flex flex-row items-center justify-between">
+        <CardHeader className="pb-2">
           <CardTitle className="text-base">Ingresos vs Egresos — {periodoActual.chartLabel}</CardTitle>
-          <div className="flex items-center gap-3 text-xs">
-            <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-foreground" />Ingresos</span>
-            <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-accent" />Egresos</span>
-          </div>
         </CardHeader>
         <CardContent>
-          {chart && chart.length > 0 ? (
-            <DualBarChart data={chart} />
-          ) : <div className="h-48 skeleton rounded-lg" />}
+          <div className="h-64">
+            {loadingChart ? (
+              <div className="h-full flex items-center justify-center text-muted-foreground text-sm">Cargando...</div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chart}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                  <XAxis dataKey="fecha" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} stroke="hsl(var(--border))" interval={chart?.length > 15 ? Math.ceil(chart.length / 10) : 0} />
+                  <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} stroke="hsl(var(--border))" width={48} tickFormatter={(v) => (v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v)} />
+                  <Tooltip
+                    formatter={(value: number) => formatPrice(value)}
+                    contentStyle={tooltipStyle}
+                    labelStyle={{ color: 'hsl(var(--foreground))', fontWeight: 600 }}
+                    itemStyle={{ color: 'hsl(var(--foreground))' }}
+                    cursor={{ fill: 'hsl(var(--secondary))' }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: 12, color: 'hsl(var(--foreground))' }} />
+                  <Bar dataKey="ingresos" name="Ingresos" fill="#16a34a" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                  <Bar dataKey="egresos" name="Egresos" fill="hsl(var(--accent))" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
         </CardContent>
       </Card>
 
       {/* Breakdown row */}
-      <div className="grid lg:grid-cols-3 gap-4">
+      <div className="grid lg:grid-cols-2 gap-4 mb-4">
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-base">Productos más vendidos</CardTitle></CardHeader>
           <CardContent>
@@ -119,6 +160,9 @@ export default function DashboardPage() {
               : top.map((p: any, i: number) => (
                 <div key={i} className="flex items-center gap-3">
                   <span className="w-6 h-6 rounded-full bg-secondary text-foreground text-xs flex items-center justify-center font-bold flex-shrink-0">{i + 1}</span>
+                  <div className="w-8 h-8 rounded bg-secondary flex-shrink-0 overflow-hidden flex items-center justify-center text-sm">
+                    {p.item?.imagenes?.[0]?.url ? <img src={p.item.imagenes[0].url} className="w-full h-full object-cover" /> : '🎌'}
+                  </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{p.item?.producto?.nombre ?? 'Producto'}</p>
                     <p className="text-xs text-muted-foreground font-mono">{p.item?.codigoSku}</p>
@@ -131,74 +175,62 @@ export default function DashboardPage() {
         </Card>
 
         <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2"><Warehouse className="w-4 h-4" />Salud de inventario</CardTitle></CardHeader>
+          <CardContent>
+            {!stockData.length ? <p className="text-muted-foreground text-sm text-center py-4">Sin stock registrado</p> : (
+              <div className="h-52 flex items-center">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={stockData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={45} outerRadius={75} paddingAngle={2}>
+                      {stockData.map((d, idx) => <Cell key={idx} fill={d.color} />)}
+                    </Pie>
+                    <Tooltip formatter={(value: number) => `${value} items`} contentStyle={tooltipStyle} itemStyle={{ color: 'hsl(var(--foreground))' }} labelStyle={{ color: 'hsl(var(--foreground))' }} />
+                    <Legend wrapperStyle={{ fontSize: 11, color: 'hsl(var(--foreground))' }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
           <CardHeader className="pb-2"><CardTitle className="text-base">Ingresos por canal</CardTitle></CardHeader>
           <CardContent>
-            {!revChan?.length ? <p className="text-muted-foreground text-sm text-center py-4">Sin datos</p>
-            : <HorizontalBars data={revChan.map((r: any) => ({ label: r.canal, value: r.monto, count: r.cantidad }))} fmt={formatPrice} />}
+            {!canalData.length ? <p className="text-muted-foreground text-sm text-center py-4">Sin datos</p> : (
+              <div className="h-52">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={canalData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={45} outerRadius={75} paddingAngle={2}>
+                      {canalData.map((_: any, idx: number) => <Cell key={idx} fill={PIE_COLORS[idx % PIE_COLORS.length]} />)}
+                    </Pie>
+                    <Tooltip formatter={(value: number) => formatPrice(value)} contentStyle={tooltipStyle} itemStyle={{ color: 'hsl(var(--foreground))' }} labelStyle={{ color: 'hsl(var(--foreground))' }} />
+                    <Legend wrapperStyle={{ fontSize: 11, color: 'hsl(var(--foreground))' }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-base">Egresos por categoría</CardTitle></CardHeader>
           <CardContent>
-            {!expCat?.length ? <p className="text-muted-foreground text-sm text-center py-4">Sin gastos en período</p>
-            : <HorizontalBars data={expCat.map((c: any) => ({ label: c.categoria, value: c.monto, count: c.cantidad }))} fmt={formatPrice} color="bg-accent" />}
+            {!expCatData.length ? <p className="text-muted-foreground text-sm text-center py-4">Sin gastos en período</p> : (
+              <div className="h-52">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={expCatData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={45} outerRadius={75} paddingAngle={2}>
+                      {expCatData.map((_: any, idx: number) => <Cell key={idx} fill={PIE_COLORS[idx % PIE_COLORS.length]} />)}
+                    </Pie>
+                    <Tooltip formatter={(value: number) => formatPrice(value)} contentStyle={tooltipStyle} itemStyle={{ color: 'hsl(var(--foreground))' }} labelStyle={{ color: 'hsl(var(--foreground))' }} />
+                    <Legend wrapperStyle={{ fontSize: 11, color: 'hsl(var(--foreground))' }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
-    </div>
-  );
-}
-
-// ── Componente: gráfica de barras duales (ingresos vs egresos) ──
-function DualBarChart({ data }: { data: any[] }) {
-  const max = Math.max(...data.map((d) => Math.max(d.ingresos, d.egresos)), 1);
-
-  return (
-    <div className="flex items-end gap-1 h-48">
-      {data.map((d, i) => {
-        const inPct = (d.ingresos / max) * 100;
-        const exPct = (d.egresos / max) * 100;
-        const dateLabel = d.fecha.includes(':')
-          ? d.fecha // hora
-          : new Date(d.fecha).toLocaleDateString('es-PE', { day: 'numeric', month: data.length > 14 ? undefined : 'short' });
-        return (
-          <div key={i} className="flex-1 flex flex-col items-center gap-1 group min-w-0">
-            <div className="w-full flex items-end justify-center gap-0.5 h-40" title={`Ing: ${formatPrice(d.ingresos)} · Eg: ${formatPrice(d.egresos)}`}>
-              <div
-                className="w-1/2 bg-foreground rounded-t transition-all hover:opacity-80"
-                style={{ height: `${Math.max(inPct, d.ingresos > 0 ? 3 : 0)}%` }}
-              />
-              <div
-                className="w-1/2 bg-accent rounded-t transition-all hover:opacity-80"
-                style={{ height: `${Math.max(exPct, d.egresos > 0 ? 3 : 0)}%` }}
-              />
-            </div>
-            <span className="text-[9px] sm:text-[10px] text-muted-foreground truncate w-full text-center">{dateLabel}</span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-// ── Componente: barras horizontales ──
-function HorizontalBars({ data, fmt, color = 'bg-foreground' }: { data: { label: string; value: number; count: number }[]; fmt: (v: number) => string; color?: string }) {
-  const max = Math.max(...data.map((d) => d.value), 1);
-  return (
-    <div className="space-y-2.5">
-      {data.map((d, i) => (
-        <div key={i}>
-          <div className="flex items-center justify-between text-xs mb-1">
-            <span className="font-medium truncate">{d.label}</span>
-            <span className="text-muted-foreground ml-2 flex-shrink-0">{fmt(d.value)}</span>
-          </div>
-          <div className="h-2 bg-secondary rounded-full overflow-hidden">
-            <div className={cn('h-full rounded-full transition-all', color)} style={{ width: `${(d.value / max) * 100}%` }} />
-          </div>
-          <p className="text-[10px] text-muted-foreground mt-0.5">{d.count} {d.count === 1 ? 'transacción' : 'transacciones'}</p>
-        </div>
-      ))}
     </div>
   );
 }

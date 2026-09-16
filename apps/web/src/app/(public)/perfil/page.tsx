@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { toast } from '@/components/ui/toaster';
+import { PageHero } from '@/components/shared/page-hero';
 
 export default function PerfilPage() {
   const router = useRouter();
@@ -47,12 +48,9 @@ export default function PerfilPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-10 max-w-3xl">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold">Mi perfil</h1>
-        <p className="text-sm text-muted-foreground mt-1">Gestiona tu información personal</p>
-      </div>
-
+    <div>
+      <PageHero title={<>Mi <span className="italic text-gradient-brand">perfil</span></>} subtitle="Gestiona tu información personal" icon={<UserCircle className="w-8 h-8" />} size="lg" watermark />
+      <div className="container mx-auto px-4 py-10 max-w-3xl">
       {/* Status card */}
       <Card className="mb-6 bg-secondary border-border">
         <CardContent className="p-5 flex flex-col sm:flex-row sm:items-center gap-4">
@@ -84,33 +82,34 @@ export default function PerfilPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="text-xs text-muted-foreground mb-1.5 block">Nombres</label>
-              <Input value={form.nombre} onChange={(e) => setForm((p) => ({ ...p, nombre: e.target.value }))} />
+              <Input placeholder="Tu nombre" value={form.nombre} onChange={(e) => setForm((p) => ({ ...p, nombre: e.target.value }))} />
             </div>
             <div>
               <label className="text-xs text-muted-foreground mb-1.5 block">Apellidos</label>
-              <Input value={form.apellido} onChange={(e) => setForm((p) => ({ ...p, apellido: e.target.value }))} />
+              <Input placeholder="Tus apellidos" value={form.apellido} onChange={(e) => setForm((p) => ({ ...p, apellido: e.target.value }))} />
             </div>
             <div>
               <label className="text-xs text-muted-foreground mb-1.5 block flex items-center gap-1"><FileText className="w-3 h-3" />DNI</label>
-              <Input value={form.dni} onChange={(e) => setForm((p) => ({ ...p, dni: e.target.value }))} maxLength={20} />
+              <Input placeholder="12345678" value={form.dni} onChange={(e) => setForm((p) => ({ ...p, dni: e.target.value }))} maxLength={20} />
             </div>
             <div>
               <label className="text-xs text-muted-foreground mb-1.5 block flex items-center gap-1"><Phone className="w-3 h-3" />Teléfono</label>
-              <Input value={form.telefono} onChange={(e) => setForm((p) => ({ ...p, telefono: e.target.value }))} />
+              <Input placeholder="+51 999 999 999" value={form.telefono} onChange={(e) => setForm((p) => ({ ...p, telefono: e.target.value }))} />
             </div>
             <div className="sm:col-span-2">
               <label className="text-xs text-muted-foreground mb-1.5 block flex items-center gap-1"><MapPin className="w-3 h-3" />Dirección</label>
-              <Input value={form.direccion} onChange={(e) => setForm((p) => ({ ...p, direccion: e.target.value }))} placeholder="Av. Principal 123, Distrito, Ciudad" />
+              <Input placeholder="Av. Principal 123, Lima" value={form.direccion} onChange={(e) => setForm((p) => ({ ...p, direccion: e.target.value }))} />
             </div>
           </div>
 
           <div className="mt-6 pt-6 border-t border-border">
-            <Button size="lg" className="gap-2 w-full sm:w-auto" disabled={isPending} onClick={() => mutate()}>
+            <Button variant="gradient" size="lg" className="gap-2 w-full sm:w-auto" disabled={isPending} onClick={() => mutate()}>
               <Save className="w-4 h-4" />{isPending ? 'Guardando...' : 'Guardar cambios'}
             </Button>
           </div>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }

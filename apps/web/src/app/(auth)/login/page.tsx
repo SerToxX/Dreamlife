@@ -70,7 +70,7 @@ export default function LoginPage() {
               <input type="checkbox" checked={isAdmin} onChange={(e) => setIsAdmin(e.target.checked)} className="accent-foreground" />
               <span className="text-sm">Soy administrador o trabajador</span>
             </label>
-            <Button type="submit" size="lg" className="h-12" disabled={loading}>{loading ? 'Ingresando...' : 'Iniciar sesión'}</Button>
+            <Button type="submit" variant="gradient" size="lg" className="h-12" disabled={loading}>{loading ? 'Ingresando...' : 'Iniciar sesión'}</Button>
           </form>
           <div className="text-center mt-6 pt-6 border-t border-border">
             <p className="text-sm text-muted-foreground">

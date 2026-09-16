@@ -1,16 +1,17 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { NotificationsGateway } from '../notifications/notifications.gateway';
 
 @Injectable()
 export class InventoryService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private gateway: NotificationsGateway) {}
 
   async getStock(ubicacionId?: number) {
     const where: any = {};
     if (ubicacionId) where.ubicacionId = ubicacionId;
     const stocks = await this.prisma.stock.findMany({
       where,
-      include: { item: { include: { producto: true, variante: true, diseno: true } }, ubicacion: true },
+      include: { item: { include: { producto: { include: { imagenes: { take: 1, orderBy: { orden: 'asc' } } } }, variante: true, diseno: true } }, ubicacion: true },
       orderBy: { id: 'asc' },
     });
     return stocks.map(s => ({
@@ -63,6 +64,7 @@ export class InventoryService {
       }),
     ]);
 
+    this.gateway.emitSync('inventario', { stockId: stock.id });
     return { stock: updatedStock, ajuste };
   }
 
@@ -90,6 +92,7 @@ export class InventoryService {
         },
       }),
     ]);
+    this.gateway.emitSync('inventario', { itemId: dto.itemId });
     return { message: 'Transferencia exitosa' };
   }
 
@@ -104,13 +107,62 @@ export class InventoryService {
     }));
   }
 
-  getHistory(itemId?: number) {
-    return this.prisma.movimientoStock.findMany({
-      where: itemId ? { itemId } : {},
-      include: { origen: true, destino: true },
-      orderBy: { createdAt: 'desc' },
-      take: 100,
-    });
+  async getHistory(itemId?: number) {
+    const [movimientos, ajustes] = await Promise.all([
+      this.prisma.movimientoStock.findMany({
+        where: itemId ? { itemId } : {},
+        include: { origen: true, destino: true },
+        orderBy: { createdAt: 'desc' },
+        take: 100,
+      }),
+      this.prisma.ajusteStock.findMany({
+        where: itemId ? { stock: { itemId } } : {},
+        include: {
+          usuario: { select: { nombre: true } },
+          stock: { include: { item: { include: { producto: true } }, ubicacion: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 100,
+      }),
+    ]);
+
+    // MovimientoStock no tiene relación directa a ProductoItem (solo itemId),
+    // así que resolvemos los nombres de producto con una consulta aparte.
+    const itemIds = [...new Set(movimientos.map((m) => m.itemId))];
+    const items = itemIds.length
+      ? await this.prisma.productoItem.findMany({ where: { id: { in: itemIds } }, include: { producto: true } })
+      : [];
+    const itemsById = new Map<number, (typeof items)[number]>(items.map((it) => [it.id, it]));
+
+    const movFmt = movimientos.map((m) => ({
+      id: `mov-${m.id}`,
+      tipo: 'TRANSFERENCIA',
+      cantidad: m.cantidad,
+      producto: itemsById.get(m.itemId)?.producto?.nombre ?? null,
+      sku: itemsById.get(m.itemId)?.codigoSku ?? null,
+      origen: m.origen?.nombre ?? null,
+      destino: m.destino?.nombre ?? null,
+      usuario: null as string | null,
+      motivo: null as string | null,
+      createdAt: m.createdAt,
+    }));
+
+    const ajFmt = ajustes.map((a) => ({
+      id: `aj-${a.id}`,
+      tipo: a.tipo,
+      cantidad: a.cantidad,
+      producto: a.stock?.item?.producto?.nombre ?? null,
+      sku: a.stock?.item?.codigoSku ?? null,
+      origen: null as string | null,
+      destino: a.stock?.ubicacion?.nombre ?? null,
+      usuario: a.usuario?.nombre ?? null,
+      motivo: a.motivo,
+      createdAt: a.createdAt,
+    }));
+
+    return [...movFmt, ...ajFmt]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 100);
   }
 
   getUbicaciones(includeInactive = false) {
@@ -121,8 +173,8 @@ export class InventoryService {
   }
 
   // ── CRUD Ubicaciones ──
-  createUbicacion(data: { nombre: string; tipo?: string; ciudad?: string }) {
-    return this.prisma.ubicacion.create({
+  async createUbicacion(data: { nombre: string; tipo?: string; ciudad?: string }) {
+    const ubicacion = await this.prisma.ubicacion.create({
       data: {
         nombre: data.nombre,
         tipo: (data.tipo as any) ?? 'tienda',
@@ -130,29 +182,36 @@ export class InventoryService {
         activa: true,
       },
     });
+    this.gateway.emitSync('ubicaciones');
+    return ubicacion;
   }
 
-  updateUbicacion(id: number, data: any) {
+  async updateUbicacion(id: number, data: any) {
     const { nombre, tipo, ciudad, activa } = data;
-    return this.prisma.ubicacion.update({ where: { id }, data: { nombre, tipo, ciudad, activa } });
+    const ubicacion = await this.prisma.ubicacion.update({ where: { id }, data: { nombre, tipo, ciudad, activa } });
+    this.gateway.emitSync('ubicaciones', { id });
+    return ubicacion;
   }
 
   async deleteUbicacion(id: number) {
     // Soft delete (marcar inactiva si tiene stocks)
     const count = await this.prisma.stock.count({ where: { ubicacionId: id } });
-    if (count > 0) {
-      return this.prisma.ubicacion.update({ where: { id }, data: { activa: false } });
-    }
-    return this.prisma.ubicacion.delete({ where: { id } });
+    const result = count > 0
+      ? await this.prisma.ubicacion.update({ where: { id }, data: { activa: false } })
+      : await this.prisma.ubicacion.delete({ where: { id } });
+    this.gateway.emitSync('ubicaciones', { id });
+    return result;
   }
 
   // Setear stock directo (para nuevos productos)
-  setStock(itemId: number, ubicacionId: number, cantidad: number) {
-    return this.prisma.stock.upsert({
+  async setStock(itemId: number, ubicacionId: number, cantidad: number) {
+    const stock = await this.prisma.stock.upsert({
       where: { itemId_ubicacionId: { itemId, ubicacionId } },
       update: { cantidad },
       create: { itemId, ubicacionId, cantidad },
     });
+    this.gateway.emitSync('inventario', { itemId });
+    return stock;
   }
 
 }

@@ -62,9 +62,14 @@ export const useAuthStore = create<AuthState>()(
       name: 'dreamlife-auth',
       partialize: (s) => ({ user: s.user, accessToken: s.accessToken, isAuthenticated: s.isAuthenticated }),
       onRehydrateStorage: () => (state) => {
-        if (typeof window !== 'undefined' && state?.accessToken) {
-          localStorage.setItem('access_token', state.accessToken);
-        }
+        // OJO: no sincronizar `localStorage['access_token']` desde aquí.
+        // El interceptor de axios (lib/api.ts) renueva el access token en segundo
+        // plano y lo escribe directo en localStorage; el `accessToken` de este store
+        // no se actualiza en ese momento y queda desactualizado. Si este callback
+        // lo volviera a copiar a localStorage en cada rehidratación (recargar la
+        // página, reabrir una pestaña, etc.), pisaría el token recién renovado con
+        // uno viejo/expirado y todas las peticiones fallarían con "Token inválido
+        // o expirado" aunque la sesión siga siendo válida.
         state?.setHydrated();
       },
     }

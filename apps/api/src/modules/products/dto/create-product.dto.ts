@@ -30,4 +30,13 @@ export class CreateProductDto {
   @Type(() => Number)
   @IsNumber()
   categoriaId?: number;
+
+  @ApiProperty({ required: false, example: 'https://...' })
+  @IsOptional()
+  @IsString()
+  imagen?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  activo?: boolean;
 }

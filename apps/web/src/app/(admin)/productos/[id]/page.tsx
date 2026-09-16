@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Save, Loader2, Plus, Package, MapPin } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, Plus, Package, MapPin, Image as ImageIcon } from 'lucide-react';
 import api from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,8 +14,8 @@ export default function EditarProductoPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const qc = useQueryClient();
-  const [form, setForm] = useState({ nombre: '', descripcion: '', precioBase: '', categoriaId: '', destacado: false, activo: true });
-  const [newItem, setNewItem] = useState({ sku: '', tamano: '', material: '' });
+  const [form, setForm] = useState({ nombre: '', descripcion: '', precioBase: '', categoriaId: '', destacado: false, activo: true, imagen: '' });
+  const [newItem, setNewItem] = useState({ codigoSku: '', tamano: '', material: '' });
   const [showItem, setShowItem] = useState(false);
 
   const { data: prod, isLoading } = useQuery({
@@ -25,11 +25,21 @@ export default function EditarProductoPage() {
   const { data: cats } = useQuery({ queryKey: ['cats'], queryFn: () => api.get('/categories').then((r) => r.data) });
   const { data: ubicaciones } = useQuery({ queryKey: ['ubicaciones'], queryFn: () => api.get('/inventory/ubicaciones').then((r) => r.data) });
 
+  // ── Formulario "inteligente": la categoría del producto decide qué campos
+  // tienen sentido para el SKU. "Talla" no aplica a accesorios/figuras/tazas,
+  // así que se reemplaza por un campo de variante libre (color, edición, etc.)
+  // en vez de forzar un campo de ropa en productos que no lo necesitan.
+  const categoriaActual = cats?.find((c: any) => String(c.id) === form.categoriaId);
+  const nombreCategoria = (categoriaActual?.nombre ?? '').toLowerCase();
+  const esRopa = /camiset|polo|hoodie|sudadera|casaca|chompa|buzo|pantal[oó]n|short|abrigo|chaqueta|ropa|prenda|talla/.test(nombreCategoria);
+  const TALLAS = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'Única'];
+
   useEffect(() => {
     if (prod) setForm({
       nombre: prod.nombre, descripcion: prod.descripcion ?? '',
       precioBase: String(prod.precioBase), categoriaId: String(prod.categoriaId ?? ''),
       destacado: prod.destacado, activo: prod.activo,
+      imagen: prod.imagenes?.[0]?.url ?? '',
     });
   }, [prod]);
 
@@ -39,6 +49,7 @@ export default function EditarProductoPage() {
       precioBase: Number(form.precioBase),
       categoriaId: form.categoriaId ? Number(form.categoriaId) : null,
       destacado: form.destacado, activo: form.activo,
+      imagen: form.imagen,
     }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-products'] }); qc.invalidateQueries({ queryKey: ['prod', id] }); toast({ title: '✅ Producto actualizado' }); },
     onError: (e: any) => toast({ title: 'Error', description: e.response?.data?.message?.toString(), variant: 'destructive' }),
@@ -46,7 +57,7 @@ export default function EditarProductoPage() {
 
   const { mutate: createItem } = useMutation({
     mutationFn: () => api.post(`/products/${id}/items`, newItem),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['prod', id] }); toast({ title: '✅ Item creado' }); setNewItem({ sku: '', tamano: '', material: '' }); setShowItem(false); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['prod', id] }); toast({ title: '✅ Item creado' }); setNewItem({ codigoSku: '', tamano: '', material: '' }); setShowItem(false); },
     onError: (e: any) => toast({ title: 'Error', description: e.response?.data?.message?.toString(), variant: 'destructive' }),
   });
 
@@ -65,6 +76,16 @@ export default function EditarProductoPage() {
 
       <Card className="mb-4"><CardContent className="p-6 flex flex-col gap-4">
         <p className="font-bold text-sm">Información</p>
+        <div className="flex gap-4 items-start">
+          <div className="w-24 h-24 rounded-md bg-secondary flex-shrink-0 overflow-hidden flex items-center justify-center border border-border">
+            {form.imagen ? <img src={form.imagen} alt="" className="w-full h-full object-cover" onError={(e) => (e.currentTarget.style.display = 'none')} /> : <ImageIcon className="w-6 h-6 text-muted-foreground" />}
+          </div>
+          <div className="flex-1">
+            <label className="text-xs text-muted-foreground mb-1.5 block">URL de imagen</label>
+            <Input placeholder="https://..." value={form.imagen} onChange={(e) => setForm((p) => ({ ...p, imagen: e.target.value }))} />
+            <p className="text-xs text-muted-foreground mt-1">Pega el link de una imagen. Se actualiza al guardar cambios.</p>
+          </div>
+        </div>
         <div>
           <label className="text-xs text-muted-foreground mb-1.5 block">Nombre</label>
           <Input value={form.nombre} onChange={(e) => setForm((p) => ({ ...p, nombre: e.target.value }))} />
@@ -90,7 +111,7 @@ export default function EditarProductoPage() {
           <label className="flex items-center gap-2"><input type="checkbox" checked={form.destacado} onChange={(e) => setForm((p) => ({ ...p, destacado: e.target.checked }))} /><span className="text-sm">Destacado</span></label>
           <label className="flex items-center gap-2"><input type="checkbox" checked={form.activo} onChange={(e) => setForm((p) => ({ ...p, activo: e.target.checked }))} /><span className="text-sm">Activo</span></label>
         </div>
-        <Button className="gap-2" disabled={isPending} onClick={() => mutate()}>
+        <Button variant="gradient" className="gap-2" disabled={isPending} onClick={() => mutate()}>
           <Save className="w-4 h-4" />{isPending ? 'Guardando...' : 'Guardar cambios'}
         </Button>
       </CardContent></Card>
@@ -106,12 +127,25 @@ export default function EditarProductoPage() {
         {showItem && (
           <div className="p-4 mb-4 rounded-md bg-secondary flex flex-col gap-3">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div><label className="text-xs text-muted-foreground mb-1 block">SKU *</label><Input placeholder="Ej: CAM-LRG-001" value={newItem.sku} onChange={(e) => setNewItem((p) => ({ ...p, sku: e.target.value }))} /></div>
-              <div><label className="text-xs text-muted-foreground mb-1 block">Talla</label><Input placeholder="M" value={newItem.tamano} onChange={(e) => setNewItem((p) => ({ ...p, tamano: e.target.value }))} /></div>
+              <div><label className="text-xs text-muted-foreground mb-1 block">SKU *</label><Input placeholder="Ej: CAM-LRG-001" value={newItem.codigoSku} onChange={(e) => setNewItem((p) => ({ ...p, codigoSku: e.target.value }))} /></div>
+              {esRopa ? (
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">Talla</label>
+                  <select className="h-10 w-full bg-input border border-border rounded-md px-3 text-sm" value={newItem.tamano} onChange={(e) => setNewItem((p) => ({ ...p, tamano: e.target.value }))}>
+                    <option value="">Selecciona talla</option>
+                    {TALLAS.map((t) => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+              ) : (
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">Variante (opcional)</label>
+                  <Input placeholder="Ej: Negro, 350ml, Edición limitada" value={newItem.tamano} onChange={(e) => setNewItem((p) => ({ ...p, tamano: e.target.value }))} />
+                </div>
+              )}
               <div><label className="text-xs text-muted-foreground mb-1 block">Material</label><Input placeholder="Algodón" value={newItem.material} onChange={(e) => setNewItem((p) => ({ ...p, material: e.target.value }))} /></div>
             </div>
             <div className="flex gap-2">
-              <Button size="sm" disabled={!newItem.sku} onClick={() => createItem()}>Crear item</Button>
+              <Button size="sm" disabled={!newItem.codigoSku} onClick={() => createItem()}>Crear item</Button>
               <Button size="sm" variant="outline" onClick={() => setShowItem(false)}>Cancelar</Button>
             </div>
           </div>

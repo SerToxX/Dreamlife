@@ -5,6 +5,7 @@ import { useCartStore } from '@/stores/cart.store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { formatPrice } from '@/lib/utils';
+import { PageHero } from '@/components/shared/page-hero';
 
 export default function CarritoPage() {
   const items = useCartStore((s) => s.items);
@@ -14,18 +15,21 @@ export default function CarritoPage() {
 
   if (items.length === 0) {
     return (
-      <div className="container mx-auto px-4 py-20 text-center max-w-md">
-        <ShoppingCart className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
-        <p className="text-lg font-bold mb-1">Tu carrito está vacío</p>
-        <p className="text-sm text-muted-foreground mb-6">Explora nuestro catálogo y agrega productos</p>
-        <Link href="/catalogo"><Button className="gap-2">Ver catálogo<ArrowRight className="w-4 h-4" /></Button></Link>
+      <div>
+        <PageHero title={<>Tu <span className="italic text-gradient-brand">carrito</span></>} icon={<ShoppingCart className="w-8 h-8" />} size="lg" watermark />
+        <div className="container mx-auto px-4 py-16 text-center max-w-md">
+          <p className="text-lg font-bold mb-1">Tu carrito está vacío</p>
+          <p className="text-sm text-muted-foreground mb-6">Explora nuestro catálogo y agrega productos</p>
+          <Link href="/catalogo"><Button variant="gradient" className="gap-2">Ver catálogo<ArrowRight className="w-4 h-4" /></Button></Link>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-10 max-w-4xl">
-      <h1 className="text-3xl font-bold mb-6">Carrito</h1>
+    <div>
+      <PageHero title={<>Tu <span className="italic text-gradient-brand">carrito</span></>} subtitle={`${items.length} ${items.length === 1 ? 'producto' : 'productos'}`} icon={<ShoppingCart className="w-8 h-8" />} size="lg" watermark />
+      <div className="container mx-auto px-4 py-10 max-w-4xl">
       <div className="grid lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 flex flex-col gap-2">
           {items.map((it) => (
@@ -59,10 +63,11 @@ export default function CarritoPage() {
             <div className="flex justify-between text-sm mb-2"><span className="text-muted-foreground">Subtotal</span><span>{formatPrice(total)}</span></div>
             <div className="flex justify-between text-sm mb-3"><span className="text-muted-foreground">Envío</span><span>{total >= 199 ? 'Gratis' : 'A calcular'}</span></div>
             <div className="border-t border-border pt-3 flex justify-between font-bold text-xl mb-4"><span>Total</span><span>{formatPrice(total)}</span></div>
-            <Link href="/checkout"><Button className="w-full gap-2 h-12">Continuar al pago<ArrowRight className="w-4 h-4" /></Button></Link>
+            <Link href="/checkout"><Button variant="gradient" className="w-full gap-2 h-12">Continuar al pago<ArrowRight className="w-4 h-4" /></Button></Link>
             <Link href="/catalogo"><Button variant="outline" className="w-full mt-2">Seguir comprando</Button></Link>
           </CardContent>
         </Card>
+      </div>
       </div>
     </div>
   );

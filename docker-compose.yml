@@ -11,10 +11,9 @@ services:
       MYSQL_DATABASE: dream_life
       MYSQL_USER: ${DB_USER:-dreamlife}
       MYSQL_PASSWORD: ${DB_PASSWORD:-DreamLife2024!}
+      TZ: America/Lima
     volumes:
       - mysql_data:/var/lib/mysql
-    ports:
-      - "3307:3306"
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD:-RootPass123!}"]
       interval: 10s
@@ -39,9 +38,11 @@ services:
       JWT_REFRESH_EXPIRES_IN: 7d
       PORT: 3001
       NODE_ENV: ${NODE_ENV:-development}
-      FRONTEND_URL: http://localhost:3000
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
       THROTTLE_TTL: 60000
       THROTTLE_LIMIT: 100
+      TZ: America/Lima
+      BACKUP_DIR: /app/backups
     ports:
       - "3001:3001"
     depends_on:
@@ -49,6 +50,7 @@ services:
         condition: service_healthy
     volumes:
       - api_uploads:/app/uploads
+      - api_backups:/app/backups
     networks:
       - dreamlife
 
@@ -57,11 +59,14 @@ services:
     build:
       context: ./apps/web
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001/api/v1}
+        NEXT_PUBLIC_SOCKET_URL: ${NEXT_PUBLIC_SOCKET_URL:-http://localhost:3001}
     container_name: dreamlife_web
     restart: unless-stopped
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:3001/api/v1
-      NEXT_PUBLIC_SOCKET_URL: http://localhost:3001
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001/api/v1}
+      NEXT_PUBLIC_SOCKET_URL: ${NEXT_PUBLIC_SOCKET_URL:-http://localhost:3001}
       NEXT_PUBLIC_APP_NAME: Dream Life
     ports:
       - "3000:3000"
@@ -73,6 +78,7 @@ services:
 volumes:
   mysql_data:
   api_uploads:
+  api_backups:
 
 networks:
   dreamlife:

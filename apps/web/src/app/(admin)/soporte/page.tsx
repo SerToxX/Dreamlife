@@ -5,13 +5,18 @@ import { MessageSquare, FileText, Eye, X } from 'lucide-react';
 import api from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { formatDate } from '@/lib/utils';
+import { formatDate, formatPrice } from '@/lib/utils';
 import { toast } from '@/components/ui/toaster';
+import { AdminPageHeader } from '@/components/shared/admin-page-header';
+
+const ESTADOS_RECLAMO = ['PENDIENTE', 'EN_PROCESO', 'RESUELTO'];
 
 export default function SoportePage() {
   const qc = useQueryClient();
   const [tab, setTab] = useState<'reclamos' | 'contactos'>('reclamos');
   const [detail, setDetail] = useState<any>(null);
+  const [respuesta, setRespuesta] = useState('');
+  const [estado, setEstado] = useState('PENDIENTE');
 
   const { data: reclamos } = useQuery({ queryKey: ['reclamos'], queryFn: () => api.get('/support/reclamaciones').then((r) => r.data) });
   const { data: contactos } = useQuery({ queryKey: ['contactos'], queryFn: () => api.get('/support/contactos').then((r) => r.data) });
@@ -21,9 +26,16 @@ export default function SoportePage() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['contactos'] }); toast({ title: '✅ Marcado como leído' }); },
   });
 
+  const { mutate: responder, isPending: respondiendo } = useMutation({
+    mutationFn: () => api.patch(`/support/reclamaciones/${detail.id}`, { estado, respuesta }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['reclamos'] }); toast({ title: '✅ Respuesta guardada' }); setDetail(null); },
+  });
+
+  const abrirDetalle = (r: any) => { setDetail({ ...r, _type: 'reclamo' }); setEstado(r.estado ?? 'PENDIENTE'); setRespuesta(r.respuesta ?? ''); };
+
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6">Soporte y reclamaciones</h1>
+      <div className="mb-6"><AdminPageHeader icon={<MessageSquare className="w-5 h-5" />} title="Soporte y reclamaciones" subtitle="Mensajes de contacto y reclamos de clientes" gradient="blue" /></div>
 
       <div className="flex gap-2 mb-4 border-b border-border">
         <button onClick={() => setTab('reclamos')} className={`flex items-center gap-2 px-4 py-2 text-sm border-b-2 ${tab === 'reclamos' ? 'border-foreground text-foreground' : 'border-transparent text-muted-foreground'}`}><FileText className="w-4 h-4" />Reclamaciones ({reclamos?.length ?? 0})</button>
@@ -39,11 +51,11 @@ export default function SoportePage() {
               : reclamos.map((r: any) => (
                 <tr key={r.id} className="border-b border-border/50 hover:bg-secondary/30">
                   <td className="p-3 font-mono text-xs">#{r.id}</td>
-                  <td className="p-3"><p className="font-medium">{r.nombre}</p><p className="text-xs text-muted-foreground">{r.dni}</p></td>
+                  <td className="p-3"><p className="font-medium">{r.nombre}</p><p className="text-xs text-muted-foreground">{r.tipoDocumento ?? 'DNI'}: {r.documento}</p></td>
                   <td className="p-3 text-xs">{r.tipo}</td>
                   <td className="p-3"><span className="px-2 py-0.5 bg-secondary rounded-full text-xs">{r.estado}</span></td>
                   <td className="p-3 text-muted-foreground text-xs">{formatDate(r.createdAt)}</td>
-                  <td className="p-3"><button onClick={() => setDetail({ ...r, _type: 'reclamo' })} className="p-1.5 hover:bg-secondary rounded-md"><Eye className="w-4 h-4" /></button></td>
+                  <td className="p-3"><button onClick={() => abrirDetalle(r)} className="p-1.5 hover:bg-secondary rounded-md"><Eye className="w-4 h-4" /></button></td>
                 </tr>
               ))}
             </tbody>
@@ -83,11 +95,35 @@ export default function SoportePage() {
                 <>
                   <div className="grid grid-cols-2 gap-2">
                     <div className="p-2.5 rounded bg-secondary"><p className="text-xs text-muted-foreground">Nombre</p><p className="font-medium">{detail.nombre}</p></div>
-                    <div className="p-2.5 rounded bg-secondary"><p className="text-xs text-muted-foreground">DNI</p><p className="font-medium">{detail.dni}</p></div>
+                    <div className="p-2.5 rounded bg-secondary"><p className="text-xs text-muted-foreground">{detail.tipoDocumento ?? 'DNI'}</p><p className="font-medium">{detail.documento}</p></div>
                     <div className="p-2.5 rounded bg-secondary col-span-2"><p className="text-xs text-muted-foreground">Correo</p><p className="font-medium">{detail.correo}</p></div>
+                    {detail.telefono && <div className="p-2.5 rounded bg-secondary col-span-2"><p className="text-xs text-muted-foreground">Teléfono</p><p className="font-medium">{detail.telefono}</p></div>}
+                    {detail.direccion && <div className="p-2.5 rounded bg-secondary col-span-2"><p className="text-xs text-muted-foreground">Domicilio</p><p className="font-medium">{detail.direccion}</p></div>}
                     <div className="p-2.5 rounded bg-secondary col-span-2"><p className="text-xs text-muted-foreground">Tipo</p><p className="font-medium">{detail.tipo}</p></div>
                   </div>
-                  <div className="p-3 rounded bg-secondary"><p className="text-xs text-muted-foreground">Descripción</p><p className="whitespace-pre-wrap">{detail.descripcion}</p></div>
+
+                  {detail.menorEdad && (
+                    <div className="p-2.5 rounded bg-secondary"><p className="text-xs text-muted-foreground">Apoderado (reclamante menor de edad)</p><p className="font-medium">{detail.apoderadoNombre} {detail.apoderadoDocumento ? `— ${detail.apoderadoDocumento}` : ''}</p></div>
+                  )}
+
+                  {(detail.detalleBien || detail.monto != null) && (
+                    <div className="grid grid-cols-2 gap-2">
+                      {detail.detalleBien && <div className="p-2.5 rounded bg-secondary col-span-2"><p className="text-xs text-muted-foreground">Producto / servicio</p><p className="font-medium">{detail.detalleBien}</p></div>}
+                      {detail.monto != null && <div className="p-2.5 rounded bg-secondary col-span-2"><p className="text-xs text-muted-foreground">Monto reclamado</p><p className="font-medium">{formatPrice(detail.monto)}</p></div>}
+                    </div>
+                  )}
+
+                  <div className="p-3 rounded bg-secondary"><p className="text-xs text-muted-foreground">Detalle de los hechos</p><p className="whitespace-pre-wrap">{detail.descripcion}</p></div>
+                  <div className="p-3 rounded bg-secondary"><p className="text-xs text-muted-foreground">Pedido del consumidor</p><p className="whitespace-pre-wrap">{detail.pedido}</p></div>
+
+                  <div className="border-t border-border pt-3">
+                    <p className="font-medium text-sm mb-2">Responder (plazo: 30 días calendario)</p>
+                    <select className="h-9 w-full bg-input border border-border rounded-md px-3 text-xs mb-2" value={estado} onChange={(e) => setEstado(e.target.value)}>
+                      {ESTADOS_RECLAMO.map((e) => <option key={e} value={e}>{e.replace('_', ' ')}</option>)}
+                    </select>
+                    <textarea className="w-full min-h-[90px] bg-input border border-border rounded-md px-3 py-2 text-sm" placeholder="Respuesta para el consumidor..." value={respuesta} onChange={(e) => setRespuesta(e.target.value)} />
+                    <Button className="w-full mt-2" disabled={respondiendo} onClick={() => responder()}>{respondiendo ? 'Guardando...' : 'Guardar respuesta'}</Button>
+                  </div>
                 </>
               ) : (
                 <>

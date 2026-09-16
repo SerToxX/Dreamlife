@@ -1,152 +1,167 @@
 'use client';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { TrendingUp, TrendingDown, DollarSign, BarChart2, MapPin } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, BarChart2, MapPin, Calendar, ShoppingBag } from 'lucide-react';
+import {
+  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+  PieChart, Pie, Cell,
+} from 'recharts';
 import api from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 import { formatPrice, cn } from '@/lib/utils';
+import { AdminPageHeader } from '@/components/shared/admin-page-header';
 
-function rangeFor(preset: string): { from: string; to: string } {
-  const today = new Date();
-  const to = today.toISOString().split('T')[0];
-  const start = new Date();
-  if (preset === 'hoy') start.setHours(0, 0, 0, 0);
-  else if (preset === 'semana') start.setDate(start.getDate() - 6);
-  else if (preset === 'mes') start.setDate(start.getDate() - 29);
-  else if (preset === 'trimestre') start.setDate(start.getDate() - 89);
-  else if (preset === 'anio') start.setDate(start.getDate() - 364);
-  return { from: start.toISOString().split('T')[0], to };
-}
+const PIE_COLORS = ['#dc2626', '#f97316', '#eab308', '#0891b2', '#7c3aed', '#db2777', '#16a34a', '#64748b'];
+const GRANULARIDADES: { id: 'dia' | 'semana' | 'mes' | 'anio'; label: string }[] = [
+  { id: 'dia', label: 'Día' },
+  { id: 'semana', label: 'Semana' },
+  { id: 'mes', label: 'Mes' },
+  { id: 'anio', label: 'Año' },
+];
+
+const tooltipStyle = {
+  background: 'hsl(var(--card))',
+  border: '1px solid hsl(var(--border))',
+  borderRadius: 8,
+  fontSize: 12,
+  color: 'hsl(var(--foreground))',
+};
 
 export default function ReportesPage() {
-  const [preset, setPreset] = useState<string>('mes');
-  const [{ from, to }, setRange] = useState(rangeFor('mes'));
+  // Mismo patrón de filtro de fechas que Finanzas: rango global opcional + granularidad para el gráfico principal
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  const [granularidad, setGranularidad] = useState<'dia' | 'semana' | 'mes' | 'anio'>('mes');
 
-  const setPresetAndRange = (p: string) => {
-    setPreset(p);
-    if (p !== 'custom') setRange(rangeFor(p));
-  };
+  const params = { from: from || undefined, to: to || undefined };
 
-  const params = { from, to };
-  const { data: summary } = useQuery({ queryKey: ['rep-sum', from, to], queryFn: () => api.get('/reports/summary', { params }).then((r) => r.data) });
-  const { data: chart } = useQuery({ queryKey: ['rep-chart', from, to], queryFn: () => api.get('/reports/financial-chart', { params }).then((r) => r.data) });
-  const { data: expByCat } = useQuery({ queryKey: ['rep-exp', from, to], queryFn: () => api.get('/reports/expenses-by-category', { params }).then((r) => r.data) });
+  const { data: resumen } = useQuery({ queryKey: ['rep-resumen', from, to], queryFn: () => api.get('/finance/summary', { params }).then((r) => r.data) });
+  const { data: serie, isLoading: loadingSerie } = useQuery({
+    queryKey: ['rep-serie', granularidad, from, to],
+    queryFn: () => api.get('/finance/serie', { params: { ...params, granularidad } }).then((r) => r.data),
+  });
   const { data: byLoc } = useQuery({ queryKey: ['rep-loc', from, to], queryFn: () => api.get('/reports/by-location', { params }).then((r) => r.data) });
+  const { data: byChannel } = useQuery({ queryKey: ['rep-canal', from, to], queryFn: () => api.get('/reports/by-channel', { params }).then((r) => r.data) });
   const { data: top } = useQuery({ queryKey: ['rep-top', from, to], queryFn: () => api.get('/reports/top-products', { params }).then((r) => r.data) });
 
-  const ingresos = summary?.ingresos ?? 0;
-  const egresos = summary?.egresos ?? 0;
-  const ganancia = ingresos - egresos;
+  const ingresos = resumen?.ingresos ?? 0;
+  const egresos = resumen?.gastos ?? 0;
+  const ganancia = resumen?.gananciaNeta ?? 0;
   const margenPct = ingresos > 0 ? (ganancia / ingresos) * 100 : 0;
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-2">Reportes</h1>
-      <p className="text-muted-foreground text-sm mb-6">Análisis financiero del negocio</p>
-
-      {/* Presets período + custom range */}
-      <Card className="mb-5">
-        <CardContent className="p-4 flex flex-col sm:flex-row gap-3 sm:items-center flex-wrap">
-          <div className="inline-flex border border-border rounded-lg p-0.5 bg-card">
-            {[
-              { id: 'hoy', label: 'Hoy' },
-              { id: 'semana', label: '7 días' },
-              { id: 'mes', label: '30 días' },
-              { id: 'trimestre', label: '3 meses' },
-              { id: 'anio', label: '1 año' },
-            ].map((p) => (
-              <button key={p.id} onClick={() => setPresetAndRange(p.id)} className={cn(
-                'px-3 py-1.5 text-xs sm:text-sm rounded-md transition-colors',
-                preset === p.id ? 'bg-primary text-primary-foreground font-medium' : 'text-muted-foreground hover:text-foreground'
-              )}>{p.label}</button>
-            ))}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+        <AdminPageHeader icon={<BarChart2 className="w-5 h-5" />} title="Reportes" subtitle="Análisis financiero del negocio" gradient="blue" />
+        {/* Mismo filtro de fechas que la pantalla de Finanzas */}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 bg-secondary/50 border border-border rounded-md px-2 py-1.5">
+            <Calendar className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+            <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="bg-transparent text-xs outline-none w-[110px]" />
+            <span className="text-muted-foreground text-xs">–</span>
+            <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="bg-transparent text-xs outline-none w-[110px]" />
           </div>
-          <div className="flex items-center gap-2 ml-auto">
-            <span className="text-xs text-muted-foreground">Desde</span>
-            <Input type="date" value={from} onChange={(e) => { setPreset('custom'); setRange((r) => ({ ...r, from: e.target.value })); }} className="w-auto" />
-            <span className="text-xs text-muted-foreground">Hasta</span>
-            <Input type="date" value={to} onChange={(e) => { setPreset('custom'); setRange((r) => ({ ...r, to: e.target.value })); }} className="w-auto" />
-          </div>
-        </CardContent>
-      </Card>
+          {(from || to) && (
+            <button onClick={() => { setFrom(''); setTo(''); }} className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2">
+              Limpiar
+            </button>
+          )}
+        </div>
+      </div>
 
       {/* KPIs financieros */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
-        <Card><CardContent className="p-5">
-          <div className="flex items-center gap-2 mb-1">
-            <TrendingUp className="w-4 h-4 text-green-600 dark:text-green-400" />
-            <p className="text-sm text-muted-foreground">Ingresos</p>
-          </div>
-          <p className="text-2xl sm:text-3xl font-bold">{formatPrice(ingresos)}</p>
-          <p className="text-xs text-muted-foreground mt-1">{summary?.ventasCantidad ?? 0} ventas</p>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+        <Card><CardContent className="p-4 sm:p-5">
+          <div className="flex items-center gap-2 mb-1"><TrendingUp className="w-4 h-4 text-green-600 dark:text-green-400" /><p className="text-xs sm:text-sm text-muted-foreground">Ingresos</p></div>
+          <p className="text-xl sm:text-3xl font-bold">{formatPrice(ingresos)}</p>
+          <p className="text-xs text-muted-foreground mt-1">{resumen?.cantidadVentas ?? 0} ventas</p>
         </CardContent></Card>
-        <Card><CardContent className="p-5">
-          <div className="flex items-center gap-2 mb-1">
-            <TrendingDown className="w-4 h-4 text-accent" />
-            <p className="text-sm text-muted-foreground">Egresos</p>
-          </div>
-          <p className="text-2xl sm:text-3xl font-bold">{formatPrice(egresos)}</p>
-          <p className="text-xs text-muted-foreground mt-1">{summary?.gastosCantidad ?? 0} gastos</p>
+        <Card><CardContent className="p-4 sm:p-5">
+          <div className="flex items-center gap-2 mb-1"><TrendingDown className="w-4 h-4 text-accent" /><p className="text-xs sm:text-sm text-muted-foreground">Egresos</p></div>
+          <p className="text-xl sm:text-3xl font-bold">{formatPrice(egresos)}</p>
+          <p className="text-xs text-muted-foreground mt-1">{resumen?.cantidadGastos ?? 0} gastos</p>
         </CardContent></Card>
-        <Card><CardContent className="p-5">
-          <div className="flex items-center gap-2 mb-1">
-            <DollarSign className="w-4 h-4" />
-            <p className="text-sm text-muted-foreground">Ganancia neta</p>
-          </div>
-          <p className={cn('text-2xl sm:text-3xl font-bold', ganancia < 0 && 'text-accent')}>{formatPrice(ganancia)}</p>
+        <Card><CardContent className="p-4 sm:p-5">
+          <div className="flex items-center gap-2 mb-1"><DollarSign className="w-4 h-4" /><p className="text-xs sm:text-sm text-muted-foreground">Ganancia neta</p></div>
+          <p className={cn('text-xl sm:text-3xl font-bold', ganancia < 0 && 'text-accent')}>{formatPrice(ganancia)}</p>
           <p className="text-xs text-muted-foreground mt-1">{margenPct.toFixed(1)}% margen</p>
+        </CardContent></Card>
+        <Card><CardContent className="p-4 sm:p-5">
+          <div className="flex items-center gap-2 mb-1"><ShoppingBag className="w-4 h-4" /><p className="text-xs sm:text-sm text-muted-foreground">Ticket promedio</p></div>
+          <p className="text-xl sm:text-3xl font-bold">{formatPrice(resumen?.cantidadVentas ? ingresos / resumen.cantidadVentas : 0)}</p>
+          <p className="text-xs text-muted-foreground mt-1">por venta</p>
         </CardContent></Card>
       </div>
 
-      {/* Gráfica financiera */}
+      {/* Gráfica financiera con granularidad (idéntico a Finanzas) */}
       <Card className="mb-4">
-        <CardHeader className="pb-2 flex flex-row items-center justify-between">
-          <CardTitle className="text-base">Ingresos vs Egresos</CardTitle>
-          <div className="flex items-center gap-3 text-xs">
-            <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-foreground" />Ingresos</span>
-            <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-accent" />Egresos</span>
+        <CardContent className="p-5">
+          <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
+            <p className="font-medium text-sm">Ingresos vs. Egresos</p>
+            <div className="flex items-center gap-1 bg-secondary/50 border border-border rounded-md p-0.5">
+              {GRANULARIDADES.map((g) => (
+                <button
+                  key={g.id}
+                  onClick={() => setGranularidad(g.id)}
+                  className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${granularidad === g.id ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground'}`}
+                >
+                  {g.label}
+                </button>
+              ))}
+            </div>
           </div>
-        </CardHeader>
-        <CardContent>
-          {chart && chart.length > 0 ? <FinancialChart data={chart} /> : <div className="h-48 skeleton rounded-lg" />}
+          <div className="h-72">
+            {loadingSerie ? (
+              <div className="h-full flex items-center justify-center text-muted-foreground text-sm">Cargando...</div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={serie}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                  <XAxis dataKey="mes" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} stroke="hsl(var(--border))" />
+                  <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} stroke="hsl(var(--border))" width={48} tickFormatter={(v) => (v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v)} />
+                  <Tooltip
+                    formatter={(value: number) => formatPrice(value)}
+                    contentStyle={tooltipStyle}
+                    labelStyle={{ color: 'hsl(var(--foreground))', fontWeight: 600 }}
+                    itemStyle={{ color: 'hsl(var(--foreground))' }}
+                    cursor={{ fill: 'hsl(var(--secondary))' }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: 12, color: 'hsl(var(--foreground))' }} />
+                  <Bar dataKey="ingresos" name="Ingresos" fill="#16a34a" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="gastos" name="Egresos" fill="hsl(var(--accent))" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
         </CardContent>
       </Card>
 
-      {/* Grid breakdowns */}
-      <div className="grid lg:grid-cols-3 gap-4 mb-4">
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-base">Egresos por categoría</CardTitle></CardHeader>
-          <CardContent>
-            {!expByCat?.length ? <p className="text-muted-foreground text-sm text-center py-4">Sin gastos</p>
-            : <HorizontalBars data={expByCat.map((c: any) => ({ label: c.categoria, value: c.monto, count: c.cantidad }))} fmt={formatPrice} color="bg-accent" />}
-          </CardContent>
-        </Card>
+      {/* Donas: egresos por categoría + ventas por canal */}
+      <div className="grid lg:grid-cols-2 gap-4 mb-4">
+        <Card><CardContent className="p-5">
+          <p className="font-medium mb-4 text-sm">Egresos por categoría</p>
+          <DonutChart data={(resumen?.categoriasEgresos ?? []).map((c: any) => ({ name: c.categoria, value: c.monto }))} />
+        </CardContent></Card>
 
+        <Card><CardContent className="p-5">
+          <p className="font-medium mb-4 text-sm">Ventas por canal</p>
+          <DonutChart data={(byChannel ?? []).map((c: any) => ({ name: c.nombre, value: c.total }))} />
+        </CardContent></Card>
+      </div>
+
+      {/* Barras horizontales: ubicación + top productos */}
+      <div className="grid lg:grid-cols-2 gap-4 mb-4">
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2"><MapPin className="w-4 h-4" />Ventas por ubicación</CardTitle></CardHeader>
           <CardContent>
-            {!byLoc?.length ? <p className="text-muted-foreground text-sm text-center py-4">Sin datos</p>
-            : <HorizontalBars data={byLoc.map((l: any) => ({ label: l.nombre ?? 'Sin asignar', value: l.total, count: l.cantidad }))} fmt={formatPrice} />}
+            <HorizontalBarChart data={(byLoc ?? []).map((l: any) => ({ name: l.nombre ?? 'Sin asignar', value: l.total }))} color="hsl(var(--primary))" />
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2"><BarChart2 className="w-4 h-4" />Top productos</CardTitle></CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2"><BarChart2 className="w-4 h-4" />Top productos (unidades vendidas)</CardTitle></CardHeader>
           <CardContent>
-            <div className="flex flex-col gap-2">
-              {!top?.length ? <p className="text-muted-foreground text-sm text-center py-4">Sin datos</p>
-              : top.slice(0, 5).map((p: any, i: number) => (
-                <div key={i} className="flex items-center justify-between py-2 border-b border-border/50 last:border-0">
-                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <span className="w-5 h-5 rounded-full bg-secondary text-xs flex items-center justify-center font-bold flex-shrink-0">{i + 1}</span>
-                    <span className="text-sm font-medium truncate">{p.item?.producto?.nombre ?? 'Producto'}</span>
-                  </div>
-                  <span className="font-bold text-sm flex-shrink-0">{p.unidades ?? p.totalVendido ?? 0}</span>
-                </div>
-              ))}
-            </div>
+            <HorizontalBarChart data={(top ?? []).slice(0, 8).map((p: any) => ({ name: p.item?.producto?.nombre ?? 'Producto', value: p.unidades ?? 0 }))} color="#0891b2" isUnits />
           </CardContent>
         </Card>
       </div>
@@ -154,46 +169,44 @@ export default function ReportesPage() {
   );
 }
 
-function FinancialChart({ data }: { data: any[] }) {
-  const max = Math.max(...data.map((d) => Math.max(d.ingresos ?? 0, d.egresos ?? 0)), 1);
-  const showAll = data.length <= 31;
+function DonutChart({ data }: { data: { name: string; value: number }[] }) {
+  const filtered = data.filter((d) => d.value > 0);
+  if (!filtered.length) return <div className="h-64 flex items-center justify-center text-muted-foreground text-sm">Sin datos en este rango</div>;
   return (
-    <div className="flex items-end gap-1 h-48">
-      {data.map((d, i) => {
-        const inPct = ((d.ingresos ?? 0) / max) * 100;
-        const exPct = ((d.egresos ?? 0) / max) * 100;
-        const fecha = new Date(d.fecha);
-        const label = showAll ? `${fecha.getDate()}` : `${fecha.getDate()}/${fecha.getMonth() + 1}`;
-        return (
-          <div key={i} className="flex-1 flex flex-col items-center gap-1 min-w-0">
-            <div className="w-full flex items-end justify-center gap-0.5 h-40" title={`${d.fecha} · Ing: ${formatPrice(d.ingresos)} · Eg: ${formatPrice(d.egresos)}`}>
-              <div className="w-1/2 bg-foreground rounded-t hover:opacity-80 transition-opacity" style={{ height: `${Math.max(inPct, d.ingresos > 0 ? 3 : 0)}%` }} />
-              <div className="w-1/2 bg-accent rounded-t hover:opacity-80 transition-opacity" style={{ height: `${Math.max(exPct, d.egresos > 0 ? 3 : 0)}%` }} />
-            </div>
-            {(showAll || i % Math.ceil(data.length / 10) === 0) && <span className="text-[9px] text-muted-foreground truncate w-full text-center">{label}</span>}
-          </div>
-        );
-      })}
+    <div className="h-64">
+      <ResponsiveContainer width="100%" height="100%">
+        <PieChart>
+          <Pie data={filtered} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={2}>
+            {filtered.map((_, idx) => <Cell key={idx} fill={PIE_COLORS[idx % PIE_COLORS.length]} />)}
+          </Pie>
+          <Tooltip formatter={(value: number) => formatPrice(value)} contentStyle={tooltipStyle} itemStyle={{ color: 'hsl(var(--foreground))' }} labelStyle={{ color: 'hsl(var(--foreground))' }} />
+          <Legend wrapperStyle={{ fontSize: 11, color: 'hsl(var(--foreground))' }} />
+        </PieChart>
+      </ResponsiveContainer>
     </div>
   );
 }
 
-function HorizontalBars({ data, fmt, color = 'bg-foreground' }: { data: { label: string; value: number; count: number }[]; fmt: (v: number) => string; color?: string }) {
-  const max = Math.max(...data.map((d) => d.value), 1);
+function HorizontalBarChart({ data, color, isUnits }: { data: { name: string; value: number }[]; color: string; isUnits?: boolean }) {
+  if (!data.length || data.every((d) => d.value === 0)) return <div className="h-64 flex items-center justify-center text-muted-foreground text-sm">Sin datos en este rango</div>;
+  const height = Math.max(64, data.length * 34);
   return (
-    <div className="space-y-2.5">
-      {data.map((d, i) => (
-        <div key={i}>
-          <div className="flex items-center justify-between text-xs mb-1">
-            <span className="font-medium truncate capitalize">{d.label}</span>
-            <span className="text-muted-foreground ml-2 flex-shrink-0">{fmt(d.value)}</span>
-          </div>
-          <div className="h-2 bg-secondary rounded-full overflow-hidden">
-            <div className={cn('h-full rounded-full transition-all', color)} style={{ width: `${(d.value / max) * 100}%` }} />
-          </div>
-          <p className="text-[10px] text-muted-foreground mt-0.5">{d.count} {d.count === 1 ? 'item' : 'items'}</p>
-        </div>
-      ))}
+    <div style={{ height }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={data} layout="vertical" margin={{ left: 8, right: 16 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
+          <XAxis type="number" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} stroke="hsl(var(--border))" tickFormatter={(v) => (isUnits ? v : v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v)} />
+          <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} stroke="hsl(var(--border))" width={110} tickFormatter={(v) => (v.length > 16 ? v.slice(0, 16) + '…' : v)} />
+          <Tooltip
+            formatter={(value: number) => (isUnits ? `${value} unidades` : formatPrice(value))}
+            contentStyle={tooltipStyle}
+            labelStyle={{ color: 'hsl(var(--foreground))', fontWeight: 600 }}
+            itemStyle={{ color: 'hsl(var(--foreground))' }}
+            cursor={{ fill: 'hsl(var(--secondary))' }}
+          />
+          <Bar dataKey="value" fill={color} radius={[0, 4, 4, 0]} maxBarSize={22} />
+        </BarChart>
+      </ResponsiveContainer>
     </div>
   );
 }

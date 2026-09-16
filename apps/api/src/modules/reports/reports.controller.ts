@@ -4,6 +4,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { ReportsService } from './reports.service';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { parseFromDate, parseToDate } from '../../common/utils/date-range.util';
 
 @ApiTags('Reports')
 @ApiBearerAuth()
@@ -13,23 +14,26 @@ export class ReportsController {
   constructor(private service: ReportsService) {}
 
   @Get('sales') getSales(@Query('from') f: string, @Query('to') t: string) {
-    return this.service.getSales(new Date(f), new Date(t));
+    return this.service.getSales(parseFromDate(f) ?? new Date(0), parseToDate(t) ?? new Date());
   }
   @Get('top-products') getTop(@Query('from') f?: string, @Query('to') t?: string, @Query('limit') l?: number) {
-    return this.service.getTopProducts(f ? new Date(f) : undefined, t ? new Date(t) : undefined, l ? +l : 10);
+    return this.service.getTopProducts(parseFromDate(f), parseToDate(t), l ? +l : 10);
   }
   @Get('by-location') byLocation(@Query('from') f?: string, @Query('to') t?: string) {
-    return this.service.getSalesByLocation(f ? new Date(f) : undefined, t ? new Date(t) : undefined);
+    return this.service.getSalesByLocation(parseFromDate(f), parseToDate(t));
+  }
+  @Get('by-channel') byChannel(@Query('from') f?: string, @Query('to') t?: string) {
+    return this.service.getSalesByChannel(parseFromDate(f), parseToDate(t));
   }
 
   // Serie temporal de ingresos/egresos
   @Get('financial-chart') financialChart(@Query('from') f: string, @Query('to') t: string) {
-    return this.service.getFinancialChart(new Date(f), new Date(t));
+    return this.service.getFinancialChart(parseFromDate(f) ?? new Date(0), parseToDate(t) ?? new Date());
   }
   @Get('expenses-by-category') expensesByCategory(@Query('from') f: string, @Query('to') t: string) {
-    return this.service.getExpensesByCategory(new Date(f), new Date(t));
+    return this.service.getExpensesByCategory(parseFromDate(f) ?? new Date(0), parseToDate(t) ?? new Date());
   }
   @Get('summary') summary(@Query('from') f: string, @Query('to') t: string) {
-    return this.service.getSummary(new Date(f), new Date(t));
+    return this.service.getSummary(parseFromDate(f) ?? new Date(0), parseToDate(t) ?? new Date());
   }
 }

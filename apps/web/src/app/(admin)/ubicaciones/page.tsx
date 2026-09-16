@@ -7,6 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/components/ui/toaster';
+import { AdminPageHeader } from '@/components/shared/admin-page-header';
 
 const TIPOS = [
   { v: 'tienda', l: 'Tienda física', icon: Store },
@@ -44,10 +45,7 @@ export default function UbicacionesPage() {
   return (
     <div>
       <div className="flex items-start justify-between mb-6 flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Ubicaciones / Locales</h1>
-          <p className="text-muted-foreground text-sm mt-1">{data?.length ?? 0} ubicaciones registradas</p>
-        </div>
+        <AdminPageHeader icon={<MapPin className="w-5 h-5" />} title="Ubicaciones / Locales" subtitle={`${data?.length ?? 0} ubicaciones registradas`} gradient="green" />
       </div>
 
       <div className="grid lg:grid-cols-3 gap-4">

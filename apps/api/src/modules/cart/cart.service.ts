@@ -5,6 +5,10 @@ import { PrismaService } from '../../prisma/prisma.service';
 export class CartService {
   constructor(private prisma: PrismaService) {}
 
+  findById(id: number) {
+    return this.prisma.carrito.findUnique({ where: { id } });
+  }
+
   // Obtener o crear carrito activo
   async getOrCreate(clienteId?: number, sessionId?: string) {
     if (!clienteId && !sessionId) throw new BadRequestException('Se requiere clienteId o sessionId');

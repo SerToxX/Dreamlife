@@ -17,7 +17,7 @@ RUN pnpm build
 # ── Etapa 2: Producción ─────────────────────────────────
 FROM node:20-alpine AS runner
 
-RUN apk add --no-cache openssl libc6-compat python3 make g++
+RUN apk add --no-cache openssl libc6-compat python3 make g++ mariadb-client
 RUN npm install -g pnpm tsx
 
 WORKDIR /app
@@ -29,8 +29,8 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/package.json ./
 
-RUN mkdir -p uploads
+RUN mkdir -p uploads backups
 
 EXPOSE 3001
 
-CMD sh -c "npx prisma db push && node dist/src/main"
+CMD sh -c "npx prisma db push --accept-data-loss && node dist/src/main"

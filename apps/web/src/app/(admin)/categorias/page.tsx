@@ -7,6 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/components/ui/toaster';
+import { AdminPageHeader } from '@/components/shared/admin-page-header';
 
 export default function CategoriasPage() {
   const qc = useQueryClient();
@@ -46,8 +47,7 @@ export default function CategoriasPage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold">Categorías</h1>
-        <p className="text-muted-foreground text-sm mt-1">{data?.length ?? 0} categorías · Estructura jerárquica</p>
+        <AdminPageHeader icon={<FolderTree className="w-5 h-5" />} title="Categorías" subtitle={`${data?.length ?? 0} categorías · Estructura jerárquica`} gradient="orange" />
       </div>
 
       <div className="grid lg:grid-cols-3 gap-4">

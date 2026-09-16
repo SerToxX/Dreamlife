@@ -6,6 +6,8 @@ import api from '@/lib/api';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ProductCard } from '@/components/features/products/product-card';
+import { PageHero } from '@/components/shared/page-hero';
+import { Logo } from '@/components/brand/logo';
 
 export default function CatalogoPage() {
   const [search, setSearch] = useState('');
@@ -20,12 +22,15 @@ export default function CatalogoPage() {
   });
 
   return (
-    <div className="container mx-auto px-4 py-8 md:py-10">
-      <div className="mb-6 md:mb-8">
-        <h1 className="text-3xl font-bold">Catálogo</h1>
-        <p className="text-sm text-muted-foreground mt-1">Encuentra el merch de tus series favoritas</p>
-      </div>
-
+    <div>
+      <PageHero
+        title={<>Catálogo <span className="italic text-gradient-brand">completo</span></>}
+        subtitle="Encuentra el merch de tus series favoritas"
+        icon={<Logo size="xl" showText={false} />}
+        size="lg"
+        watermark
+      />
+      <div className="container mx-auto px-4 py-8 md:py-10">
       <div className="relative max-w-md mb-4">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <Input placeholder="Buscar por nombre o SKU..." className="pl-10" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
@@ -66,6 +71,7 @@ export default function CatalogoPage() {
           )}
         </>
       )}
+      </div>
     </div>
   );
 }

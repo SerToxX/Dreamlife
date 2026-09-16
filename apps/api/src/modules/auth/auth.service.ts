@@ -46,6 +46,11 @@ export class AuthService {
     const exists = await this.prisma.cliente.findUnique({ where: { correo: dto.correo } });
     if (exists) throw new ConflictException('El correo ya está registrado');
 
+    if (dto.dni) {
+      const dniExists = await this.prisma.cliente.findUnique({ where: { dni: dto.dni } });
+      if (dniExists) throw new ConflictException('Ya existe una cuenta registrada con ese DNI');
+    }
+
     const hash = await bcrypt.hash(dto.contrasena, 12);
     const cliente = await this.prisma.cliente.create({
       data: {

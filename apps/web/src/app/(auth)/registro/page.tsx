@@ -89,7 +89,7 @@ export default function RegistroPage() {
               </div>
             </div>
             <div className="sm:col-span-2">
-              <Button type="submit" size="lg" className="h-12 w-full mt-2" disabled={loading}>{loading ? 'Creando cuenta...' : 'Crear cuenta'}</Button>
+              <Button type="submit" variant="gradient" size="lg" className="h-12 w-full mt-2" disabled={loading}>{loading ? 'Creando cuenta...' : 'Crear cuenta'}</Button>
             </div>
           </form>
 

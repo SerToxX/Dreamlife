@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&family=Pacifico&family=Bebas+Neue&family=Caveat:wght@700&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -17,6 +18,8 @@
     --muted-foreground: 0 0% 42%;
     --accent: 0 75% 50%;
     --accent-foreground: 0 0% 100%;
+    --accent-2: 262 70% 58%;
+    --accent-2-foreground: 0 0% 100%;
     --border: 0 0% 90%;
     --input: 0 0% 96%;
     --ring: 0 0% 8%;
@@ -37,6 +40,8 @@
     --muted-foreground: 0 0% 60%;
     --accent: 0 75% 55%;
     --accent-foreground: 0 0% 100%;
+    --accent-2: 262 75% 65%;
+    --accent-2-foreground: 0 0% 100%;
     --border: 0 0% 18%;
     --input: 0 0% 14%;
     --ring: 0 0% 96%;
@@ -71,19 +76,55 @@
 }
 
 
-/* ── Logo con "fondo transparente" simulado ── */
-/* Light: multiply hace que el blanco del JPG se mezcle con el fondo claro */
-/* Dark: invert convierte el dragón negro→blanco; screen mezcla el blanco con fondo oscuro */
-.logo-transparent,
-.watermark-logo {
-  mix-blend-mode: multiply;
+/* ── Logo: PNG con transparencia real. En dark mode solo invertimos
+   el color (negro → blanco), ya no hace falta simular transparencia. ── */
+.brand-icon {
+  filter: none;
 }
-.dark .logo-transparent,
-.dark .watermark-logo {
-  mix-blend-mode: screen;
+.dark .brand-icon {
   filter: invert(1);
 }
 .watermark-logo {
   pointer-events: none;
   user-select: none;
+}
+.dark .watermark-logo {
+  filter: invert(1);
+}
+
+/* ── Anillo de pulso suave para el botón flotante de ayuda ── */
+@keyframes soft-pulse {
+  0% { transform: scale(1); opacity: 0.55; }
+  70% { transform: scale(1.7); opacity: 0; }
+  100% { transform: scale(1.7); opacity: 0; }
+}
+.pulse-ring {
+  animation: soft-pulse 2.4s cubic-bezier(0.2, 0.6, 0.4, 1) infinite;
+}
+
+/* ── Inputs de fecha nativos: el ícono de calendario del navegador es negro
+   por defecto y se pierde sobre fondos oscuros. Lo invertimos en dark mode. ── */
+input[type='date']::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.7;
+}
+input[type='date']::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+.dark input[type='date']::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}
+
+/* ── Acentos "anime": texto en degradado rojo→morado y brillo en hover ── */
+.text-gradient-brand {
+  background: linear-gradient(135deg, hsl(var(--accent)), hsl(var(--accent-2)));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.glow-on-hover {
+  transition: box-shadow 0.3s ease, transform 0.2s ease;
+}
+.glow-on-hover:hover {
+  box-shadow: 0 10px 30px -10px hsl(var(--accent) / 0.45);
 }

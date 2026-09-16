@@ -7,7 +7,7 @@ const api = axios.create({
 });
 
 // Rutas que NO requieren redirección automática a login si fallan
-const PUBLIC_PATHS = ['/products', '/categories', '/marketing/ofertas', '/auth/', '/support/contacto', '/support/reclamaciones', '/custom-orders'];
+const PUBLIC_PATHS = ['/products', '/categories', '/marketing/ofertas', '/auth/', '/support/contacto', '/support/reclamaciones'];
 
 api.interceptors.request.use((config) => {
   const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;

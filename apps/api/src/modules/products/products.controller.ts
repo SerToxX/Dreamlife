@@ -28,6 +28,11 @@ export class ProductsController {
   @Public() @Get('featured')
   getFeatured() { return this.productsService.getFeatured(); }
 
+  // Buscador liviano de SKUs, usado por el admin al armar una campaña de ofertas
+  @Get('items/search')
+  @UseGuards(AuthGuard('jwt'), RolesGuard) @Roles('admin', 'worker')
+  searchItems(@Query('search') search?: string) { return this.productsService.searchItems(search); }
+
   @Public() @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) { return this.productsService.findOne(id); }
 

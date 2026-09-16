@@ -1,14 +1,18 @@
 import { Logo } from '@/components/brand/logo';
 import { Card, CardContent } from '@/components/ui/card';
+import { PageHero } from '@/components/shared/page-hero';
 
 export default function SobreNosotros() {
   return (
-    <div className="container mx-auto px-4 py-10 max-w-3xl">
-      <div className="text-center mb-10">
-        <div className="flex justify-center mb-4"><Logo size="xl" showText={false} /></div>
-        <h1 className="text-4xl md:text-5xl font-bold mb-3 text-balance">Nosotros</h1>
-        <p className="text-muted-foreground text-balance">Tu tienda de anime favorita en Perú, hecha por fans, para fans.</p>
-      </div>
+    <div>
+      <PageHero
+        title={<>Sobre <span className="italic text-gradient-brand">nosotros</span></>}
+        subtitle="Tu tienda de anime favorita en Perú, hecha por fans, para fans."
+        icon={<Logo size="xl" showText={false} />}
+        size="lg"
+        watermark
+      />
+      <div className="container mx-auto px-4 py-10 max-w-3xl">
 
       <div className="space-y-4 mb-10">
         <Card><CardContent className="p-6">
@@ -29,6 +33,7 @@ export default function SobreNosotros() {
         <Card><CardContent className="p-5"><p className="text-2xl font-bold">2K+</p><p className="text-xs text-muted-foreground">Clientes felices</p></CardContent></Card>
         <Card><CardContent className="p-5"><p className="text-2xl font-bold">500+</p><p className="text-xs text-muted-foreground">Productos</p></CardContent></Card>
         <Card><CardContent className="p-5"><p className="text-2xl font-bold">24/7</p><p className="text-xs text-muted-foreground">Soporte</p></CardContent></Card>
+      </div>
       </div>
     </div>
   );

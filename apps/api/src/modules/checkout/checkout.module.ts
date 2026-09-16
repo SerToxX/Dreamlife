@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { CheckoutController } from './checkout.controller';
 import { CheckoutService } from './checkout.service';
+import { NotificationsModule } from '../notifications/notifications.module';
 
-@Module({ controllers: [CheckoutController], providers: [CheckoutService] })
+@Module({ imports: [NotificationsModule], controllers: [CheckoutController], providers: [CheckoutService] })
 export class CheckoutModule {}

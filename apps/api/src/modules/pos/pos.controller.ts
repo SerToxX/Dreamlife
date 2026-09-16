@@ -15,6 +15,7 @@ export class PosController {
   constructor(private service: PosService) {}
   @Post('caja/open') openCaja(@Body() body: any, @CurrentUser('id') uid: number) { return this.service.openCaja(uid, body.ubicacionId, body.montoInicial); }
   @Post('caja/:id/close') closeCaja(@Param('id', ParseIntPipe) id: number, @Body('montoFinal') mf: number) { return this.service.closeCaja(id, mf); }
+  @Get('caja/actual') getCajaAbierta(@CurrentUser('id') uid: number) { return this.service.getCajaAbierta(uid); }
   @Post('sale') sale(@Body() body: any, @CurrentUser('id') uid: number) { return this.service.sale({ ...body, usuarioId: uid }); }
-  @Get('cajas') getCajas(@CurrentUser('id') uid: number) { return this.service.getCajas(uid); }
+  @Get('cajas') getCajas(@CurrentUser('id') uid: number, @CurrentUser('rol') rol: string) { return this.service.getCajas(rol === 'admin' ? undefined : uid); }
 }

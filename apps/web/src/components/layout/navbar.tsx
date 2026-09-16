@@ -77,7 +77,7 @@ export function Navbar() {
             <Button variant="ghost" size="icon" className="relative" aria-label="Carrito">
               <ShoppingCart className="w-4 h-4" />
               {count > 0 && (
-                <span className="absolute -top-1 -right-1 bg-accent text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] px-1 flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 bg-gradient-to-br from-accent to-accent-2 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] px-1 flex items-center justify-center shadow-sm">
                   {count > 9 ? '9+' : count}
                 </span>
               )}

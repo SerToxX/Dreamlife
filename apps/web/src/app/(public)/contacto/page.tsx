@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { toast } from '@/components/ui/toaster';
+import { PageHero } from '@/components/shared/page-hero';
+import { Logo } from '@/components/brand/logo';
 
 export default function ContactoPage() {
   const [form, setForm] = useState({ nombre: '', correo: '', telefono: '', asunto: '', mensaje: '' });
@@ -17,11 +19,15 @@ export default function ContactoPage() {
   });
 
   return (
-    <div className="container mx-auto px-4 py-10">
-      <div className="text-center mb-10">
-        <h1 className="text-3xl md:text-4xl font-bold mb-2">Contáctanos</h1>
-        <p className="text-muted-foreground">¿Tienes alguna duda? Estamos para ayudarte</p>
-      </div>
+    <div>
+      <PageHero
+        title={<>Contáctanos <span className="italic text-gradient-brand">directo</span></>}
+        subtitle="¿Tienes alguna duda? Estamos para ayudarte"
+        icon={<Logo size="xl" showText={false} />}
+        size="lg"
+        watermark
+      />
+      <div className="container mx-auto px-4 py-10">
       <div className="grid lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
         <div className="lg:col-span-2">
           <Card><CardContent className="p-6 sm:p-8 flex flex-col gap-4">
@@ -51,6 +57,7 @@ export default function ContactoPage() {
             <div><p className="font-medium text-sm">Ubicación</p><p className="text-xs text-muted-foreground">Av. Anime 123, Lima, Perú</p></div>
           </CardContent></Card>
         </div>
+      </div>
       </div>
     </div>
   );

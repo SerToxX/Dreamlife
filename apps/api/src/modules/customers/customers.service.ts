@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
@@ -31,8 +31,14 @@ export class CustomersService {
     return c;
   }
 
-  update(id: number, data: any) {
+  async update(id: number, data: any) {
     const { correo, contrasena, ...allowed } = data;
+
+    if (allowed.dni) {
+      const dup = await this.prisma.cliente.findUnique({ where: { dni: allowed.dni } });
+      if (dup && dup.id !== id) throw new ConflictException('Ya existe una cuenta registrada con ese DNI');
+    }
+
     return this.prisma.cliente.update({ where: { id }, data: allowed });
   }
 }

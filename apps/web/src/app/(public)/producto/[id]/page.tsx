@@ -3,12 +3,12 @@ import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { ShoppingCart, Heart, ArrowLeft, Loader2, Sparkles, Truck, Shield } from 'lucide-react';
+import { ShoppingCart, Heart, ArrowLeft, Loader2, Sparkles, Truck, Shield, Tag } from 'lucide-react';
 import api from '@/lib/api';
 import { useCartStore } from '@/stores/cart.store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { formatPrice } from '@/lib/utils';
+import { formatPrice, getPrecioConDescuento } from '@/lib/utils';
 import { toast } from '@/components/ui/toaster';
 
 export default function ProductDetailPage() {
@@ -28,10 +28,11 @@ export default function ProductDetailPage() {
   const currentItem = selected !== null ? prod.items?.[selected] : prod.items?.[0];
   const stock = currentItem?.stocks?.reduce((a: number, s: any) => a + s.cantidad, 0) ?? 0;
   const imagen = prod.imagenes?.[0]?.url;
+  const { precioFinal, precioOriginal, oferta } = getPrecioConDescuento(prod.precioBase, currentItem?.ofertaItems);
 
   const handleAdd = () => {
     if (!currentItem) { toast({ title: 'Selecciona una variante', variant: 'destructive' }); return; }
-    addItem({ id: currentItem.id, sku: currentItem.codigoSku, nombre: prod.nombre, precio: Number(prod.precioBase), imagen, variante: currentItem.variante?.tamano, qty });
+    addItem({ id: currentItem.id, sku: currentItem.codigoSku, nombre: prod.nombre, precio: precioFinal, imagen, variante: currentItem.variante?.tamano, qty });
     toast({ title: 'Agregado al carrito', description: prod.nombre });
   };
 
@@ -40,15 +41,28 @@ export default function ProductDetailPage() {
       <Link href="/catalogo" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-6"><ArrowLeft className="w-4 h-4" />Catálogo</Link>
 
       <div className="grid lg:grid-cols-2 gap-8 lg:gap-12">
-        <div className="aspect-square bg-secondary rounded-lg overflow-hidden">
+        <div className="aspect-square bg-secondary rounded-lg overflow-hidden relative">
           {imagen ? <img src={imagen} alt={prod.nombre} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-6xl">🎌</div>}
+          {oferta && (
+            <span className="absolute top-3 right-3 bg-accent-2 text-white text-xs font-bold px-2.5 py-1.5 rounded flex items-center gap-1">
+              <Tag className="w-3 h-3" />{oferta.nombre}
+            </span>
+          )}
         </div>
 
         <div>
           {prod.categoria && <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">{prod.categoria.nombre}</p>}
           <h1 className="text-3xl md:text-4xl font-bold mb-3 text-balance">{prod.nombre}</h1>
           {currentItem?.codigoSku && <p className="text-xs font-mono text-muted-foreground mb-3">SKU: {currentItem.codigoSku}</p>}
-          <p className="text-3xl font-bold mb-5">{formatPrice(prod.precioBase)}</p>
+          <div className="flex items-center gap-3 mb-5">
+            {oferta && <span className="text-lg text-muted-foreground line-through">{formatPrice(precioOriginal)}</span>}
+            <p className={`text-3xl font-bold ${oferta ? 'text-accent-2' : ''}`}>{formatPrice(precioFinal)}</p>
+            {oferta && (
+              <span className="bg-accent-2/15 text-accent-2 text-xs font-bold px-2 py-1 rounded">
+                {oferta.tipoDescuento === 'PORCENTAJE' ? `-${oferta.valor}%` : `-${formatPrice(oferta.valor)}`}
+              </span>
+            )}
+          </div>
 
           {prod.descripcion && <p className="text-muted-foreground mb-6 leading-relaxed">{prod.descripcion}</p>}
 
@@ -76,7 +90,7 @@ export default function ProductDetailPage() {
           </div>
 
           <div className="flex gap-2 mb-6">
-            <Button size="lg" className="flex-1 gap-2 h-12" onClick={handleAdd} disabled={stock === 0}><ShoppingCart className="w-5 h-5" />{stock === 0 ? 'Sin stock' : 'Agregar al carrito'}</Button>
+            <Button variant="gradient" size="lg" className="flex-1 gap-2 h-12 text-base" onClick={handleAdd} disabled={stock === 0}><ShoppingCart className="w-5 h-5" />{stock === 0 ? 'Sin stock' : 'Agregar al carrito'}</Button>
             <Button size="lg" variant="outline" className="h-12 w-12 p-0"><Heart className="w-5 h-5" /></Button>
           </div>
 

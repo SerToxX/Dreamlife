@@ -1,12 +1,13 @@
 'use client';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Eye, X, Search, User } from 'lucide-react';
+import { Eye, X, Search, User, Users } from 'lucide-react';
 import api from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { formatDate, formatPrice } from '@/lib/utils';
+import { AdminPageHeader } from '@/components/shared/admin-page-header';
 
 export default function ClientesPage() {
   const [search, setSearch] = useState('');
@@ -26,8 +27,7 @@ export default function ClientesPage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold">Clientes</h1>
-        <p className="text-muted-foreground text-sm mt-1">{data?.length ?? 0} clientes registrados</p>
+        <AdminPageHeader icon={<Users className="w-5 h-5" />} title="Clientes" subtitle={`${data?.length ?? 0} clientes registrados`} gradient="purple" />
       </div>
 
       <div className="relative max-w-md mb-5">

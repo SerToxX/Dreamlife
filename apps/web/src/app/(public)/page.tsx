@@ -26,29 +26,44 @@ export default function HomePage() {
 
   return (
     <div>
-      {/* HERO con marca de agua del logo de fondo */}
+      {/* HERO principal con imagen temática de fondo, distinta para modo claro/oscuro */}
       <section className="relative border-b border-border overflow-hidden">
+        {/* Fondo modo oscuro */}
+        <div
+          className="absolute inset-0 hidden dark:block bg-cover bg-center"
+          style={{ backgroundImage: "url('/banners/banner-dark.jpg')" }}
+          aria-hidden="true"
+        />
+        {/* Fondo modo claro */}
+        <div
+          className="absolute inset-0 dark:hidden bg-cover bg-center"
+          style={{ backgroundImage: "url('/banners/banner-light.jpg')" }}
+          aria-hidden="true"
+        />
+        {/* Overlay que se tiñe con el color de fondo del tema activo, para legibilidad en ambos modos */}
+        <div className="absolute inset-0 bg-background/30" aria-hidden="true" />
+        {/* Logo como marca de agua, encima de la imagen */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <img
-            src="/logo_dreamlife.jpg"
+            src="/logo-icon.png"
             alt=""
             aria-hidden="true"
-            className="watermark-logo w-full max-w-[640px] h-auto object-contain opacity-[0.08] dark:opacity-[0.12]"
+            className="watermark-logo w-full max-w-[520px] h-auto object-contain opacity-[0.08] dark:opacity-[0.12] dark:invert"
           />
         </div>
 
-        <div className="relative container mx-auto px-4 py-20 md:py-28">
+        <div className="relative container mx-auto px-4 py-20 md:py-40">
           <div className="max-w-3xl mx-auto text-center">
             <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold mb-6 leading-tight text-balance">
               Tu mundo anime,
               <br />
-              <span className="italic">en un solo lugar.</span>
+              <span className="italic text-gradient-brand">en un solo lugar.</span>
             </h1>
             <p className="text-lg text-muted-foreground mb-8 max-w-xl mx-auto text-balance">
               Camisetas, figuras, accesorios y diseños exclusivos de tus series favoritas. Calidad premium con envío a todo el Perú.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <Link href="/catalogo"><Button size="lg" className="gap-2 h-12 px-8">Explorar colección<ArrowRight className="w-4 h-4" /></Button></Link>
+              <Link href="/catalogo"><Button size="lg" className="gap-2 h-12 px-8 glow-on-hover">Explorar colección<ArrowRight className="w-4 h-4" /></Button></Link>
               <Link href="/personalizado"><Button size="lg" variant="outline" className="gap-2 h-12 px-8"><Sparkles className="w-4 h-4" />Diseño personalizado</Button></Link>
             </div>
           </div>

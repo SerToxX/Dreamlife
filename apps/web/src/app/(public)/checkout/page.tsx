@@ -2,8 +2,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useMutation } from '@tanstack/react-query';
-import { ArrowLeft, CreditCard, Smartphone, Truck, Banknote } from 'lucide-react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { ArrowLeft, CreditCard, Smartphone, Truck, Banknote, LogOut, User, MapPin } from 'lucide-react';
 import api from '@/lib/api';
 import { useCartStore } from '@/stores/cart.store';
 import { useAuthStore } from '@/stores/auth.store';
@@ -13,31 +13,50 @@ import { Card, CardContent } from '@/components/ui/card';
 import { formatPrice, cn } from '@/lib/utils';
 import { toast } from '@/components/ui/toaster';
 
+const TIPOS_DOCUMENTO = [
+  { id: 'DNI', label: 'DNI' },
+  { id: 'CE', label: 'Carné de Extranjería' },
+  { id: 'PASAPORTE', label: 'Pasaporte' },
+  { id: 'RUC', label: 'RUC' },
+];
+
 export default function CheckoutPage() {
   const router = useRouter();
+  const qc = useQueryClient();
   const items = useCartStore((s) => s.items);
   const clear = useCartStore((s) => s.clear);
   const { isAuthenticated, user, hydrated } = useAuthStore();
+  const logout = useAuthStore((s) => s.logout);
   const [metodo, setMetodo] = useState('YAPE');
-  const [form, setForm] = useState({ nombre: '', telefono: '', direccion: '', notas: '' });
+  const [form, setForm] = useState({
+    nombre: '', correo: '', telefono: '',
+    tipoDocumento: 'DNI', numeroDocumento: '',
+    direccion: '', distrito: '', provincia: '', departamento: '', referencia: '',
+    notas: '',
+  });
 
   useEffect(() => {
-    if (hydrated && (!isAuthenticated || user?.type !== 'cliente')) {
+    if (hydrated && !isAuthenticated) {
       toast({ title: 'Debes iniciar sesión', variant: 'destructive' });
       router.replace('/login');
     }
-  }, [hydrated, isAuthenticated, user, router]);
+  }, [hydrated, isAuthenticated, router]);
 
-  // Precargar datos del cliente
+  // Autocompleta con los datos de la cuenta, pero deja todo editable — el
+  // comprador puede cambiar cualquier campo antes de pagar (ej. enviar a
+  // otra dirección, o usar el documento de otra persona).
   useEffect(() => {
     if (isAuthenticated && user?.type === 'cliente') {
       api.get('/customers/me').then((r) => {
-        setForm({
-          nombre: `${r.data.nombre} ${r.data.apellido ?? ''}`.trim(),
-          telefono: r.data.telefono ?? '',
-          direccion: r.data.direccion ?? '',
-          notas: '',
-        });
+        const d = r.data;
+        setForm((p) => ({
+          ...p,
+          nombre: `${d.nombre ?? ''} ${d.apellido ?? ''}`.trim(),
+          correo: d.correo ?? '',
+          telefono: d.telefono ?? '',
+          numeroDocumento: d.dni ?? '',
+          direccion: d.direccion ?? '',
+        }));
       }).catch(() => {});
     }
   }, [isAuthenticated, user]);
@@ -45,16 +64,29 @@ export default function CheckoutPage() {
   const total = items.reduce((a, i) => a + i.precio * i.qty, 0);
   const envio = total >= 199 ? 0 : 15;
 
+  const camposCompletos = form.nombre.trim() && form.correo.trim() && form.telefono.trim()
+    && form.numeroDocumento.trim() && form.direccion.trim() && form.distrito.trim()
+    && form.provincia.trim() && form.departamento.trim();
+
   const { mutate, isPending } = useMutation({
     mutationFn: () => api.post('/checkout', {
       items: items.map((i) => ({ itemId: i.id, cantidad: i.qty, precio: i.precio })),
       metodoPago: metodo,
+      nombreComprador: form.nombre,
+      correoComprador: form.correo,
+      telefonoComprador: form.telefono,
+      tipoDocumento: form.tipoDocumento,
+      numeroDocumento: form.numeroDocumento,
       direccionEnvio: form.direccion,
-      telefonoEnvio: form.telefono,
-      notas: form.notas,
+      distrito: form.distrito,
+      provincia: form.provincia,
+      departamento: form.departamento,
+      referencia: form.referencia,
+      notaCliente: form.notas,
     }),
     onSuccess: () => {
       clear();
+      qc.invalidateQueries({ queryKey: ['my-orders'] });
       toast({ title: '¡Pedido realizado!', description: 'Te contactaremos pronto' });
       router.push('/mis-pedidos');
     },
@@ -62,6 +94,25 @@ export default function CheckoutPage() {
   });
 
   if (!hydrated || !isAuthenticated) return null;
+
+  if (user?.type !== 'cliente') {
+    return (
+      <div className="container mx-auto px-4 py-16 max-w-md text-center">
+        <h1 className="text-xl font-bold mb-2">Esta sección es para clientes</h1>
+        <p className="text-muted-foreground text-sm mb-6">
+          Estás conectado con una cuenta de <strong>{user?.rol}</strong> ({user?.correo}), no con una cuenta de cliente.
+          Cierra esa sesión e inicia con (o crea) una cuenta de cliente para comprar.
+        </p>
+        <div className="flex flex-col gap-2">
+          <Button className="gap-2" onClick={async () => { await logout(); router.push('/login'); }}>
+            <LogOut className="w-4 h-4" />Cerrar sesión de {user?.rol}
+          </Button>
+          <Link href="/dashboard"><Button variant="outline" className="w-full">Volver al panel admin</Button></Link>
+        </div>
+      </div>
+    );
+  }
+
   if (items.length === 0) {
     return (
       <div className="container mx-auto py-20 text-center">
@@ -74,17 +125,36 @@ export default function CheckoutPage() {
   return (
     <div className="container mx-auto px-4 py-8 max-w-5xl">
       <Link href="/carrito" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-4"><ArrowLeft className="w-4 h-4" />Volver al carrito</Link>
-      <h1 className="text-3xl font-bold mb-6">Checkout</h1>
+      <h1 className="text-3xl font-bold mb-6">Check<span className="text-gradient-brand italic">out</span></h1>
 
       <div className="grid lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 space-y-4">
           <Card><CardContent className="p-5">
-            <p className="font-bold mb-4 flex items-center gap-2"><Truck className="w-4 h-4" />Datos de envío</p>
+            <p className="font-bold mb-4 flex items-center gap-2"><User className="w-4 h-4" />Datos del comprador</p>
+            <p className="text-xs text-muted-foreground mb-4 -mt-2">Precargados de tu cuenta — puedes cambiarlos si lo necesitas.</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="sm:col-span-2"><label className="text-xs text-muted-foreground mb-1 block">Nombre completo</label><Input value={form.nombre} onChange={(e) => setForm((p) => ({ ...p, nombre: e.target.value }))} /></div>
-              <div><label className="text-xs text-muted-foreground mb-1 block">Teléfono</label><Input value={form.telefono} onChange={(e) => setForm((p) => ({ ...p, telefono: e.target.value }))} /></div>
-              <div><label className="text-xs text-muted-foreground mb-1 block">Notas (opcional)</label><Input value={form.notas} onChange={(e) => setForm((p) => ({ ...p, notas: e.target.value }))} /></div>
-              <div className="sm:col-span-2"><label className="text-xs text-muted-foreground mb-1 block">Dirección</label><Input value={form.direccion} onChange={(e) => setForm((p) => ({ ...p, direccion: e.target.value }))} placeholder="Av. ..., distrito, referencia" /></div>
+              <div className="sm:col-span-2"><label className="text-xs text-muted-foreground mb-1 block">Nombre completo *</label><Input value={form.nombre} onChange={(e) => setForm((p) => ({ ...p, nombre: e.target.value }))} /></div>
+              <div><label className="text-xs text-muted-foreground mb-1 block">Correo *</label><Input type="email" value={form.correo} onChange={(e) => setForm((p) => ({ ...p, correo: e.target.value }))} /></div>
+              <div><label className="text-xs text-muted-foreground mb-1 block">Teléfono *</label><Input value={form.telefono} onChange={(e) => setForm((p) => ({ ...p, telefono: e.target.value }))} /></div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Tipo de documento *</label>
+                <select className="h-10 w-full bg-input border border-border rounded-md px-3 text-sm" value={form.tipoDocumento} onChange={(e) => setForm((p) => ({ ...p, tipoDocumento: e.target.value }))}>
+                  {TIPOS_DOCUMENTO.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+                </select>
+              </div>
+              <div><label className="text-xs text-muted-foreground mb-1 block">N° de documento *</label><Input value={form.numeroDocumento} onChange={(e) => setForm((p) => ({ ...p, numeroDocumento: e.target.value }))} /></div>
+            </div>
+          </CardContent></Card>
+
+          <Card><CardContent className="p-5">
+            <p className="font-bold mb-4 flex items-center gap-2"><MapPin className="w-4 h-4" />Dirección de envío</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="sm:col-span-2"><label className="text-xs text-muted-foreground mb-1 block">Dirección (calle, número) *</label><Input value={form.direccion} onChange={(e) => setForm((p) => ({ ...p, direccion: e.target.value }))} placeholder="Av. Los Álamos 123" /></div>
+              <div><label className="text-xs text-muted-foreground mb-1 block">Distrito *</label><Input value={form.distrito} onChange={(e) => setForm((p) => ({ ...p, distrito: e.target.value }))} placeholder="Miraflores" /></div>
+              <div><label className="text-xs text-muted-foreground mb-1 block">Provincia *</label><Input value={form.provincia} onChange={(e) => setForm((p) => ({ ...p, provincia: e.target.value }))} placeholder="Lima" /></div>
+              <div><label className="text-xs text-muted-foreground mb-1 block">Departamento *</label><Input value={form.departamento} onChange={(e) => setForm((p) => ({ ...p, departamento: e.target.value }))} placeholder="Lima" /></div>
+              <div><label className="text-xs text-muted-foreground mb-1 block">Referencia (opcional)</label><Input value={form.referencia} onChange={(e) => setForm((p) => ({ ...p, referencia: e.target.value }))} placeholder="Frente al parque" /></div>
+              <div className="sm:col-span-2"><label className="text-xs text-muted-foreground mb-1 block">Notas para el pedido (opcional)</label><Input value={form.notas} onChange={(e) => setForm((p) => ({ ...p, notas: e.target.value }))} /></div>
             </div>
           </CardContent></Card>
 
@@ -122,7 +192,8 @@ export default function CheckoutPage() {
             <div className="flex justify-between"><span className="text-muted-foreground">Envío</span><span>{envio === 0 ? 'Gratis' : formatPrice(envio)}</span></div>
             <div className="flex justify-between font-bold text-lg pt-2 border-t border-border"><span>Total</span><span>{formatPrice(total + envio)}</span></div>
           </div>
-          <Button className="w-full mt-4 h-12" disabled={!form.direccion || !form.telefono || isPending} onClick={() => mutate()}>{isPending ? 'Procesando...' : 'Confirmar pedido'}</Button>
+          <Button variant="gradient" className="w-full mt-4 h-12 text-base" disabled={!camposCompletos || isPending} onClick={() => mutate()}>{isPending ? 'Procesando...' : 'Confirmar pedido'}</Button>
+          {!camposCompletos && <p className="text-[11px] text-muted-foreground text-center mt-2">Completa los campos marcados con * para continuar</p>}
         </CardContent></Card>
       </div>
     </div>

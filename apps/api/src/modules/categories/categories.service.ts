@@ -1,9 +1,10 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { NotificationsGateway } from '../notifications/notifications.gateway';
 
 @Injectable()
 export class CategoriesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private gateway: NotificationsGateway) {}
 
   findAll() {
     return this.prisma.categoria.findMany({
@@ -29,17 +30,23 @@ export class CategoriesService {
     return cat;
   }
 
-  create(data: { nombre: string; slug?: string; padreId?: number | null }) {
+  async create(data: { nombre: string; slug?: string; padreId?: number | null }) {
     const slug = data.slug ?? data.nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-    return this.prisma.categoria.create({ data: { nombre: data.nombre, slug, padreId: data.padreId ?? null } });
+    const cat = await this.prisma.categoria.create({ data: { nombre: data.nombre, slug, padreId: data.padreId ?? null } });
+    this.gateway.emitSync('categorias');
+    this.gateway.emitPublicSync('categorias');
+    return cat;
   }
 
-  update(id: number, data: any) {
+  async update(id: number, data: any) {
     const { nombre, slug, padreId } = data;
-    return this.prisma.categoria.update({
+    const cat = await this.prisma.categoria.update({
       where: { id },
       data: { nombre, slug, padreId: padreId ?? null },
     });
+    this.gateway.emitSync('categorias', { id });
+    this.gateway.emitPublicSync('categorias', { id });
+    return cat;
   }
 
   async remove(id: number) {
@@ -47,6 +54,9 @@ export class CategoriesService {
     if (productos > 0) throw new BadRequestException(`No se puede eliminar: tiene ${productos} productos asociados`);
     const hijos = await this.prisma.categoria.count({ where: { padreId: id } });
     if (hijos > 0) throw new BadRequestException(`No se puede eliminar: tiene ${hijos} subcategorías`);
-    return this.prisma.categoria.delete({ where: { id } });
+    const deleted = await this.prisma.categoria.delete({ where: { id } });
+    this.gateway.emitSync('categorias', { id });
+    this.gateway.emitPublicSync('categorias', { id });
+    return deleted;
   }
 }

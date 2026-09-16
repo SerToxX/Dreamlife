@@ -5,7 +5,8 @@ import { Logo } from '@/components/brand/logo';
 
 export function Footer() {
   return (
-    <footer className="border-t border-border bg-card/30 mt-20">
+    <footer className="border-t border-border bg-card/30 mt-20 relative">
+      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-accent/50 to-transparent" />
       <div className="container mx-auto px-4 py-12">
         <div className="grid md:grid-cols-4 gap-8">
           <div>

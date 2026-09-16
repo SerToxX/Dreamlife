@@ -6,11 +6,13 @@ import { Loader2, Menu, Home } from 'lucide-react';
 import { AdminSidebar } from '@/components/layout/admin-sidebar';
 import { useAuthStore } from '@/stores/auth.store';
 import { ThemeToggle } from '@/components/shared/theme-toggle';
+import { useRealtimeSync } from '@/hooks/use-realtime-sync';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { isAuthenticated, user, hydrated } = useAuthStore();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  useRealtimeSync();
 
   useEffect(() => {
     if (!hydrated) return;
