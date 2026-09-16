@@ -2,6 +2,11 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MailService } from '../../common/mail/mail.service';
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// DNI y RUC peruanos son siempre numéricos (8 y 11 dígitos); CE y
+// Pasaporte sí pueden traer letras, así que esos no se validan aquí.
+const DOC_NUMERICO: Record<string, number> = { DNI: 8, RUC: 11 };
+
 @Injectable()
 export class SupportService {
   constructor(private prisma: PrismaService, private mail: MailService) {}
@@ -11,20 +16,30 @@ export class SupportService {
   // para la Hoja de Reclamación: identificación del consumidor (con domicilio
   // y documento), identificación del bien contratado, detalle de los hechos
   // y el pedido concreto del consumidor (distinto de la descripción).
-  createReclamacion(body: any) {
+  async createReclamacion(body: any) {
     if (!body?.nombre?.trim()) throw new BadRequestException('El nombre es obligatorio');
     if (!body?.documento?.trim()) throw new BadRequestException('El documento de identidad es obligatorio');
     if (!body?.correo?.trim()) throw new BadRequestException('El correo es obligatorio');
+    if (!EMAIL_RE.test(body.correo.trim())) throw new BadRequestException('El correo no tiene un formato válido');
     if (!body?.direccion?.trim()) throw new BadRequestException('El domicilio es obligatorio');
     if (!body?.descripcion?.trim()) throw new BadRequestException('El detalle de los hechos es obligatorio');
     if (!body?.pedido?.trim()) throw new BadRequestException('El pedido del consumidor es obligatorio');
     if (body?.menorEdad && !body?.apoderadoNombre?.trim()) throw new BadRequestException('Si el reclamante es menor de edad, se requiere el nombre del apoderado');
 
-    return this.prisma.reclamacion.create({
+    const tipoDoc = body.tipoDocumento ?? 'DNI';
+    const digitos = DOC_NUMERICO[tipoDoc];
+    if (digitos && !new RegExp(`^\\d{${digitos}}$`).test(body.documento.trim())) {
+      throw new BadRequestException(`El ${tipoDoc} debe tener exactamente ${digitos} dígitos numéricos`);
+    }
+    if (body?.telefono?.trim() && !/^[\d\s+]+$/.test(body.telefono.trim())) {
+      throw new BadRequestException('El teléfono solo puede contener números');
+    }
+
+    const reclamacion = await this.prisma.reclamacion.create({
       data: {
         tipo: body.tipo === 'QUEJA' ? 'QUEJA' : 'RECLAMO',
         nombre: body.nombre.trim(),
-        tipoDocumento: body.tipoDocumento ?? 'DNI',
+        tipoDocumento: tipoDoc,
         documento: body.documento.trim(),
         correo: body.correo.trim(),
         telefono: body.telefono?.trim() || null,
@@ -38,6 +53,22 @@ export class SupportService {
         pedido: body.pedido.trim(),
       },
     });
+
+    this.mail.sendReclamacionNotification({
+      tipo: reclamacion.tipo,
+      nombre: reclamacion.nombre,
+      tipoDocumento: reclamacion.tipoDocumento,
+      documento: reclamacion.documento,
+      correo: reclamacion.correo,
+      telefono: reclamacion.telefono,
+      direccion: reclamacion.direccion,
+      detalleBien: reclamacion.detalleBien,
+      monto: reclamacion.monto,
+      descripcion: reclamacion.descripcion,
+      pedido: reclamacion.pedido,
+    });
+
+    return reclamacion;
   }
 
   listReclamaciones() {
@@ -52,7 +83,11 @@ export class SupportService {
   async createContacto(data: any) {
     if (!data?.nombre?.trim()) throw new BadRequestException('El nombre es obligatorio');
     if (!data?.correo?.trim()) throw new BadRequestException('El correo es obligatorio');
+    if (!EMAIL_RE.test(data.correo.trim())) throw new BadRequestException('El correo no tiene un formato válido');
     if (!data?.mensaje?.trim()) throw new BadRequestException('El mensaje es obligatorio');
+    if (data?.telefono?.trim() && !/^[\d\s+]+$/.test(data.telefono.trim())) {
+      throw new BadRequestException('El teléfono solo puede contener números');
+    }
 
     const contacto = await this.prisma.contacto.create({ data });
     this.mail.sendContactoNotification({
