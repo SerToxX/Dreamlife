@@ -1,9 +1,10 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { MailService } from '../../common/mail/mail.service';
 
 @Injectable()
 export class SupportService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private mail: MailService) {}
 
   // Libro de reclamaciones — campos exigidos por el Código de Protección y
   // Defensa del Consumidor (Ley 29571) y su reglamento (D.S. 011-2011-PCM)
@@ -48,8 +49,20 @@ export class SupportService {
   }
 
   // Contacto
-  createContacto(data: any) {
-    return this.prisma.contacto.create({ data });
+  async createContacto(data: any) {
+    if (!data?.nombre?.trim()) throw new BadRequestException('El nombre es obligatorio');
+    if (!data?.correo?.trim()) throw new BadRequestException('El correo es obligatorio');
+    if (!data?.mensaje?.trim()) throw new BadRequestException('El mensaje es obligatorio');
+
+    const contacto = await this.prisma.contacto.create({ data });
+    this.mail.sendContactoNotification({
+      nombre: data.nombre,
+      correo: data.correo,
+      telefono: data.telefono,
+      asunto: data.asunto,
+      mensaje: data.mensaje,
+    });
+    return contacto;
   }
 
   listContactos() {

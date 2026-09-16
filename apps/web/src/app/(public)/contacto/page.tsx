@@ -46,7 +46,7 @@ export default function ContactoPage() {
         <div className="space-y-3">
           <Card><CardContent className="p-5 flex items-start gap-3">
             <Mail className="w-5 h-5 text-muted-foreground flex-shrink-0 mt-0.5" />
-            <div><p className="font-medium text-sm">Email</p><p className="text-xs text-muted-foreground">contacto@dreamlife.com</p></div>
+            <div><p className="font-medium text-sm">Email</p><p className="text-xs text-muted-foreground">dreamlife@dreamlifeperu.com</p></div>
           </CardContent></Card>
           <Card><CardContent className="p-5 flex items-start gap-3">
             <Phone className="w-5 h-5 text-muted-foreground flex-shrink-0 mt-0.5" />

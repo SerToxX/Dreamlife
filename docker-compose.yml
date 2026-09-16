@@ -43,6 +43,11 @@ services:
       THROTTLE_LIMIT: 100
       TZ: America/Lima
       BACKUP_DIR: /app/backups
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-465}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      CONTACT_EMAIL_TO: ${CONTACT_EMAIL_TO:-}
     ports:
       - "3001:3001"
     depends_on:
