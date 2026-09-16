@@ -85,8 +85,17 @@ export class SupportService {
 
   listReclamaciones() {
     // Sin el campo `pdf` (puede pesar cientos de KB por fila) — la lista del
-    // panel admin no lo necesita, solo la descarga individual.
-    return this.prisma.reclamacion.findMany({ orderBy: { createdAt: 'desc' }, omit: { pdf: true } });
+    // panel admin no lo necesita, solo la descarga individual. `omit` de
+    // Prisma no está habilitado en este cliente, así que se hace con `select`.
+    return this.prisma.reclamacion.findMany({
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true, tipo: true, nombre: true, tipoDocumento: true, documento: true, correo: true,
+        telefono: true, direccion: true, menorEdad: true, apoderadoNombre: true, apoderadoDocumento: true,
+        detalleBien: true, monto: true, descripcion: true, pedido: true, estado: true, respuesta: true,
+        createdAt: true, updatedAt: true,
+      },
+    });
   }
 
   async getReclamacionPdf(id: number) {
@@ -129,7 +138,10 @@ export class SupportService {
   }
 
   listContactos() {
-    return this.prisma.contacto.findMany({ orderBy: { createdAt: 'desc' }, omit: { pdf: true } });
+    return this.prisma.contacto.findMany({
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, nombre: true, correo: true, telefono: true, asunto: true, mensaje: true, leido: true, createdAt: true },
+    });
   }
 
   async getContactoPdf(id: number) {
