@@ -15,6 +15,22 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// Cuando el refresh token también expira/falla, no basta con borrar los
+// tokens crudos de localStorage: el store de Zustand (`dreamlife-auth`) se
+// queda con `isAuthenticated: true` porque nada le avisa, así que el panel
+// admin sigue mostrando la sesión como válida pero cada request falla en
+// silencio (pantallas "vacías" hasta que el usuario cierra sesión a mano).
+// Se limpia todo y se fuerza la vuelta a /login para que quede consistente.
+function sessionExpired() {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem('access_token');
+  localStorage.removeItem('refresh_token');
+  localStorage.removeItem('dreamlife-auth');
+  if (!window.location.pathname.startsWith('/login')) {
+    window.location.href = '/login';
+  }
+}
+
 let isRefreshing = false;
 let failedQueue: any[] = [];
 
@@ -40,10 +56,15 @@ api.interceptors.response.use(
       original._retry = true;
       isRefreshing = true;
 
+      // Si esta petición sí llevaba un token (el usuario tenía sesión) y de
+      // todos modos llegó 401, el 401 es real — no es un guest anónimo.
+      const teniaSesion = !!original?.headers?.Authorization;
+
       const refreshToken = typeof window !== 'undefined' ? localStorage.getItem('refresh_token') : null;
       if (!refreshToken) {
         isRefreshing = false;
-        if (typeof window !== 'undefined') {
+        if (teniaSesion) sessionExpired();
+        else if (typeof window !== 'undefined') {
           localStorage.removeItem('access_token');
           localStorage.removeItem('refresh_token');
         }
@@ -62,8 +83,7 @@ api.interceptors.response.use(
         return api(original);
       } catch (refreshErr) {
         processQueue(refreshErr, null);
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
+        sessionExpired();
         return Promise.reject(refreshErr);
       } finally {
         isRefreshing = false;

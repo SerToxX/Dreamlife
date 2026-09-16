@@ -1,15 +1,17 @@
 'use client';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { TrendingUp, TrendingDown, DollarSign, BarChart2, MapPin, Calendar, ShoppingBag } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, BarChart2, MapPin, Calendar, ShoppingBag, FileSpreadsheet, Loader2 } from 'lucide-react';
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   PieChart, Pie, Cell,
 } from 'recharts';
 import api from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { formatPrice, cn } from '@/lib/utils';
 import { AdminPageHeader } from '@/components/shared/admin-page-header';
+import { toast } from '@/components/ui/toaster';
 
 const PIE_COLORS = ['#dc2626', '#f97316', '#eab308', '#0891b2', '#7c3aed', '#db2777', '#16a34a', '#64748b'];
 const GRANULARIDADES: { id: 'dia' | 'semana' | 'mes' | 'anio'; label: string }[] = [
@@ -32,8 +34,28 @@ export default function ReportesPage() {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [granularidad, setGranularidad] = useState<'dia' | 'semana' | 'mes' | 'anio'>('mes');
+  const [exportando, setExportando] = useState(false);
 
   const params = { from: from || undefined, to: to || undefined };
+
+  const exportarExcel = async () => {
+    setExportando(true);
+    try {
+      const res = await api.get('/reports/export/excel', { params, responseType: 'blob' });
+      const url = URL.createObjectURL(new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `reporte-dreamlife-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast({ title: 'No se pudo exportar', description: 'Intenta de nuevo en un momento', variant: 'destructive' });
+    } finally {
+      setExportando(false);
+    }
+  };
 
   const { data: resumen } = useQuery({ queryKey: ['rep-resumen', from, to], queryFn: () => api.get('/finance/summary', { params }).then((r) => r.data) });
   const { data: serie, isLoading: loadingSerie } = useQuery({
@@ -66,6 +88,10 @@ export default function ReportesPage() {
               Limpiar
             </button>
           )}
+          <Button size="sm" variant="outline" className="gap-1.5" onClick={exportarExcel} disabled={exportando}>
+            {exportando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileSpreadsheet className="w-3.5 h-3.5" />}
+            {exportando ? 'Generando...' : 'Exportar Excel'}
+          </Button>
         </div>
       </div>
 

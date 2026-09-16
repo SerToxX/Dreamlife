@@ -1,9 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { FinanceService } from '../finance/finance.service';
+import { ExcelService } from '../../common/excel/excel.service';
 
 @Injectable()
 export class ReportsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private finance: FinanceService, private excel: ExcelService) {}
 
   getSales(from: Date, to: Date) {
     return this.prisma.venta.findMany({
@@ -11,6 +13,15 @@ export class ReportsService {
       include: { cliente: true, detalles: { include: { item: { include: { producto: true } } } }, pagos: true, ubicacion: true },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  async exportExcel(from?: Date, to?: Date) {
+    const [ventas, ingresosRes, egresosRes] = await Promise.all([
+      this.getSales(from ?? new Date(0), to ?? new Date()),
+      this.finance.getIngresos({ from, to }),
+      this.finance.getGastos({ from, to }),
+    ]);
+    return this.excel.buildReportesWorkbook({ ventas, ingresos: ingresosRes.data, egresos: egresosRes.data });
   }
 
   async getTopProducts(from?: Date, to?: Date, limit = 10) {
