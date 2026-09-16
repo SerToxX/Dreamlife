@@ -2,7 +2,7 @@
 FROM node:20-alpine AS builder
 
 RUN apk add --no-cache openssl libc6-compat python3 make g++
-RUN npm install -g pnpm
+RUN npm install -g pnpm@9.0.0
 
 WORKDIR /app
 
@@ -18,7 +18,7 @@ RUN pnpm build
 FROM node:20-alpine AS runner
 
 RUN apk add --no-cache openssl libc6-compat python3 make g++ mariadb-client
-RUN npm install -g pnpm tsx
+RUN npm install -g pnpm@9.0.0 tsx
 
 WORKDIR /app
 
