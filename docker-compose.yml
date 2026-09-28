@@ -39,6 +39,7 @@ services:
       PORT: 3001
       NODE_ENV: ${NODE_ENV:-development}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
       THROTTLE_TTL: 60000
       THROTTLE_LIMIT: 100
       TZ: America/Lima

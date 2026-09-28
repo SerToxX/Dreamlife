@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getCookie, setCookie, removeCookie } from './cookies';
 
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1',
@@ -10,22 +11,22 @@ const api = axios.create({
 const PUBLIC_PATHS = ['/products', '/categories', '/marketing/ofertas', '/auth/', '/support/contacto', '/support/reclamaciones'];
 
 api.interceptors.request.use((config) => {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+  const token = typeof window !== 'undefined' ? getCookie('access_token') : null;
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
 
 // Cuando el refresh token también expira/falla, no basta con borrar los
-// tokens crudos de localStorage: el store de Zustand (`dreamlife-auth`) se
+// tokens crudos del storage: el store de Zustand (`dreamlife-auth`) se
 // queda con `isAuthenticated: true` porque nada le avisa, así que el panel
 // admin sigue mostrando la sesión como válida pero cada request falla en
 // silencio (pantallas "vacías" hasta que el usuario cierra sesión a mano).
 // Se limpia todo y se fuerza la vuelta a /login para que quede consistente.
 function sessionExpired() {
   if (typeof window === 'undefined') return;
-  localStorage.removeItem('access_token');
-  localStorage.removeItem('refresh_token');
-  localStorage.removeItem('dreamlife-auth');
+  removeCookie('access_token');
+  removeCookie('refresh_token');
+  removeCookie('dreamlife-auth');
   if (!window.location.pathname.startsWith('/login')) {
     window.location.href = '/login';
   }
@@ -60,13 +61,13 @@ api.interceptors.response.use(
       // todos modos llegó 401, el 401 es real — no es un guest anónimo.
       const teniaSesion = !!original?.headers?.Authorization;
 
-      const refreshToken = typeof window !== 'undefined' ? localStorage.getItem('refresh_token') : null;
+      const refreshToken = typeof window !== 'undefined' ? getCookie('refresh_token') : null;
       if (!refreshToken) {
         isRefreshing = false;
         if (teniaSesion) sessionExpired();
         else if (typeof window !== 'undefined') {
-          localStorage.removeItem('access_token');
-          localStorage.removeItem('refresh_token');
+          removeCookie('access_token');
+          removeCookie('refresh_token');
         }
         return Promise.reject(err);
       }
@@ -76,8 +77,8 @@ api.interceptors.response.use(
           `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'}/auth/refresh`,
           { refreshToken },
         );
-        localStorage.setItem('access_token', data.accessToken);
-        localStorage.setItem('refresh_token', data.refreshToken);
+        setCookie('access_token', data.accessToken);
+        setCookie('refresh_token', data.refreshToken);
         api.defaults.headers.common.Authorization = `Bearer ${data.accessToken}`;
         processQueue(null, data.accessToken);
         return api(original);

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { createJSONStorage, persist } from 'zustand/middleware';
 import api from '@/lib/api';
+import { getCookie, setCookie, removeCookie } from '@/lib/cookies';
 
 interface User {
   id: number;
@@ -32,8 +33,8 @@ export const useAuthStore = create<AuthState>()(
       login: async (correo, contrasena, isAdmin = false) => {
         const { data } = await api.post(isAdmin ? '/auth/login/admin' : '/auth/login', { correo, contrasena });
         if (typeof window !== 'undefined') {
-          localStorage.setItem('access_token', data.accessToken);
-          localStorage.setItem('refresh_token', data.refreshToken);
+          setCookie('access_token', data.accessToken);
+          setCookie('refresh_token', data.refreshToken);
         }
         const payload = JSON.parse(atob(data.accessToken.split('.')[1]));
         set({ accessToken: data.accessToken, user: { id: payload.sub, correo: payload.correo, rol: payload.rol, type: payload.type }, isAuthenticated: true });
@@ -45,13 +46,13 @@ export const useAuthStore = create<AuthState>()(
       },
 
       logout: async () => {
-        const refreshToken = typeof window !== 'undefined' ? localStorage.getItem('refresh_token') : null;
+        const refreshToken = typeof window !== 'undefined' ? getCookie('refresh_token') : null;
         if (refreshToken) {
           try { await api.post('/auth/logout', { refreshToken }); } catch {}
         }
         if (typeof window !== 'undefined') {
-          localStorage.removeItem('access_token');
-          localStorage.removeItem('refresh_token');
+          removeCookie('access_token');
+          removeCookie('refresh_token');
         }
         set({ user: null, accessToken: null, isAuthenticated: false });
       },
@@ -61,12 +62,17 @@ export const useAuthStore = create<AuthState>()(
     {
       name: 'dreamlife-auth',
       partialize: (s) => ({ user: s.user, accessToken: s.accessToken, isAuthenticated: s.isAuthenticated }),
+      storage: createJSONStorage(() => ({
+        getItem: (name) => getCookie(name),
+        setItem: (name, value) => setCookie(name, value),
+        removeItem: (name) => removeCookie(name),
+      })),
       onRehydrateStorage: () => (state) => {
-        // OJO: no sincronizar `localStorage['access_token']` desde aquí.
+        // OJO: no sincronizar el cookie/storage del `access_token` desde aquí.
         // El interceptor de axios (lib/api.ts) renueva el access token en segundo
-        // plano y lo escribe directo en localStorage; el `accessToken` de este store
+        // plano y lo escribe directo en el cookie; el `accessToken` de este store
         // no se actualiza en ese momento y queda desactualizado. Si este callback
-        // lo volviera a copiar a localStorage en cada rehidratación (recargar la
+        // lo volviera a copiar al storage en cada rehidratación (recargar la
         // página, reabrir una pestaña, etc.), pisaría el token recién renovado con
         // uno viejo/expirado y todas las peticiones fallarían con "Token inválido
         // o expirado" aunque la sesión siga siendo válida.

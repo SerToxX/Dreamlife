@@ -5,6 +5,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import * as compression from 'compression';
 import { json, urlencoded } from 'express';
+import { corsOriginCallback } from './common/utils/cors-origins.util';
 
 async function bootstrap() {
   // ── Falla rápido si van a producción con secretos de ejemplo ──
@@ -30,7 +31,7 @@ async function bootstrap() {
   // ── Seguridad ──────────────────────────────────────────
   app.use(helmet());
   app.enableCors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    origin: corsOriginCallback,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   });
