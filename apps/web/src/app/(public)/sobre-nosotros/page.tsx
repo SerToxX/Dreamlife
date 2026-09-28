@@ -12,7 +12,7 @@ function formatNumber(num: number): string {
 async function getStats() {
   try {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-    const res = await fetch(`${apiUrl}/products/stats/public`, { cache: 'revalidate' });
+    const res = await fetch(`${apiUrl}/products/stats/public`, { next: { revalidate: 3600 } });
     if (!res.ok) throw new Error('Failed to fetch stats');
     return res.json();
   } catch {
