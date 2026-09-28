@@ -63,9 +63,9 @@ export const useAuthStore = create<AuthState>()(
       name: 'dreamlife-auth',
       partialize: (s) => ({ user: s.user, accessToken: s.accessToken, isAuthenticated: s.isAuthenticated }),
       storage: createJSONStorage(() => ({
-        getItem: (name) => getCookie(name),
-        setItem: (name, value) => setCookie(name, value),
-        removeItem: (name) => removeCookie(name),
+        getItem: (name: string) => getCookie(name),
+        setItem: (name: string, value: string) => { setCookie(name, value); },
+        removeItem: (name: string) => { removeCookie(name); },
       })),
       onRehydrateStorage: () => (state) => {
         // OJO: no sincronizar el cookie/storage del `access_token` desde aquí.
