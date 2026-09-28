@@ -3,6 +3,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { NotificationsGateway } from '../notifications/notifications.gateway';
+import { revalidateWebPath } from '../../common/utils/revalidate.util';
 
 @Injectable()
 export class ProductsService {
@@ -63,6 +64,7 @@ export class ProductsService {
     }
     this.gateway.emitSync('productos', { id: producto.id });
     this.gateway.emitPublicSync('productos', { id: producto.id });
+    revalidateWebPath('/sobre-nosotros');
     return this.findOne(producto.id);
   }
 

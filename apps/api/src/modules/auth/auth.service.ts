@@ -8,6 +8,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import * as bcrypt from 'bcryptjs';
 import { LoginDto } from './dto/login.dto';
 import { RegisterClienteDto } from './dto/register-cliente.dto';
+import { revalidateWebPath } from '../../common/utils/revalidate.util';
 
 @Injectable()
 export class AuthService {
@@ -63,6 +64,8 @@ export class AuthService {
         contrasena: hash,
       },
     });
+
+    revalidateWebPath('/sobre-nosotros');
 
     const { contrasena, ...result } = cliente;
     return result;
