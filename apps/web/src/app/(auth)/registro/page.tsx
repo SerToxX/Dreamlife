@@ -19,8 +19,8 @@ export default function RegistroPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (form.contrasena.length < 8) {
-      toast({ title: 'Contraseña muy corta', description: 'Debe tener al menos 8 caracteres', variant: 'destructive' });
+    if (form.contrasena.length < 6) {
+      toast({ title: 'Contraseña muy corta', description: 'Debe tener al menos 6 caracteres', variant: 'destructive' });
       return;
     }
     setLoading(true);
@@ -82,11 +82,14 @@ export default function RegistroPage() {
             <div className="sm:col-span-2">
               <label className="text-xs text-muted-foreground mb-1.5 block">Contraseña *</label>
               <div className="relative">
-                <Input type={showPass ? 'text' : 'password'} placeholder="Mínimo 8 caracteres" value={form.contrasena} onChange={(e) => setForm((p) => ({ ...p, contrasena: e.target.value }))} minLength={8} required />
+                <Input type={showPass ? 'text' : 'password'} placeholder="Mínimo 6 caracteres" value={form.contrasena} onChange={(e) => setForm((p) => ({ ...p, contrasena: e.target.value }))} minLength={6} required />
                 <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
                   {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
+              <p className={`text-xs mt-1 ${form.contrasena.length > 0 && form.contrasena.length < 6 ? 'text-destructive' : 'text-muted-foreground'}`}>
+                Debe tener al menos 6 caracteres
+              </p>
             </div>
             <div className="sm:col-span-2">
               <Button type="submit" variant="gradient" size="lg" className="h-12 w-full mt-2" disabled={loading}>{loading ? 'Creando cuenta...' : 'Crear cuenta'}</Button>
