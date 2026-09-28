@@ -7,6 +7,7 @@ import { AdminSidebar } from '@/components/layout/admin-sidebar';
 import { useAuthStore } from '@/stores/auth.store';
 import { ThemeToggle } from '@/components/shared/theme-toggle';
 import { useRealtimeSync } from '@/hooks/use-realtime-sync';
+import { STORE_URL } from '@/lib/urls';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -55,14 +56,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </button>
           <span className="font-bold text-sm">Dream Life Admin</span>
           <div className="flex items-center gap-1">
-            <Link href="/" className="p-2 rounded-md hover:bg-secondary" title="Ver tienda"><Home className="w-4 h-4" /></Link>
+            <Link href={STORE_URL} target="_blank" className="p-2 rounded-md hover:bg-secondary" title="Ver tienda"><Home className="w-4 h-4" /></Link>
             <ThemeToggle />
           </div>
         </div>
 
         {/* Topbar desktop con link a tienda */}
         <div className="hidden lg:flex h-12 border-b border-border bg-card items-center justify-end px-6 sticky top-0 z-30 gap-2">
-          <Link href="/" target="_blank" className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1.5 px-3 py-1 rounded-md hover:bg-secondary">
+          <Link href={STORE_URL} target="_blank" className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1.5 px-3 py-1 rounded-md hover:bg-secondary">
             <Home className="w-3.5 h-3.5" />Ver tienda en nueva pestaña
           </Link>
         </div>

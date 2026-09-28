@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Eye, EyeOff, ArrowLeft, Store } from 'lucide-react';
@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Logo } from '@/components/brand/logo';
 import { ThemeToggle } from '@/components/shared/theme-toggle';
 import { toast } from '@/components/ui/toaster';
+import { STORE_URL } from '@/lib/urls';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -17,11 +18,19 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
+  // Se calcula tras montar (no en el primer render) para evitar mismatch de
+  // hidratación: el servidor no conoce el hostname real del navegador.
+  const [isAdminSubdomain, setIsAdminSubdomain] = useState(false);
+
+  useEffect(() => {
+    setIsAdminSubdomain(window.location.hostname.startsWith('admin.'));
+  }, []);
+
+  const storeHref = isAdminSubdomain ? STORE_URL : '/';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const isAdminSubdomain = typeof window !== 'undefined' && window.location.hostname.startsWith('admin.');
     try {
       if (isAdminSubdomain) {
         // En admin.dreamlifeperu.com solo se permite login de admin/trabajador.
@@ -49,7 +58,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center p-4 bg-background">
       {/* Botones top */}
       <div className="absolute top-4 left-4">
-        <Link href="/">
+        <Link href={storeHref}>
           <Button variant="outline" size="sm" className="gap-2">
             <ArrowLeft className="w-4 h-4" />Volver a la tienda
           </Button>
@@ -81,10 +90,12 @@ export default function LoginPage() {
             <Button type="submit" variant="gradient" size="lg" className="h-12" disabled={loading}>{loading ? 'Ingresando...' : 'Iniciar sesión'}</Button>
           </form>
           <div className="text-center mt-6 pt-6 border-t border-border">
-            <p className="text-sm text-muted-foreground">
-              ¿No tienes cuenta? <Link href="/registro" className="text-foreground hover:underline font-medium">Regístrate</Link>
-            </p>
-            <Link href="/" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground mt-3">
+            {!isAdminSubdomain && (
+              <p className="text-sm text-muted-foreground">
+                ¿No tienes cuenta? <Link href="/registro" className="text-foreground hover:underline font-medium">Regístrate</Link>
+              </p>
+            )}
+            <Link href={storeHref} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground mt-3">
               <Store className="w-3.5 h-3.5" />Continuar como invitado a la tienda
             </Link>
           </div>
