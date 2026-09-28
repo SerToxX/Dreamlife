@@ -21,8 +21,19 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    const isAdminSubdomain = typeof window !== 'undefined' && window.location.hostname.startsWith('admin.');
     try {
-      // Intenta login como cliente primero
+      if (isAdminSubdomain) {
+        // En admin.dreamlifeperu.com solo se permite login de admin/trabajador.
+        // No se intenta login de cliente aquí: una cuenta de cliente debe fallar
+        // directamente, no autenticarse y recién ahí ser rebotada.
+        await login(correo, password, true);
+        toast({ title: '¡Bienvenido al panel administrativo!' });
+        router.push('/dashboard');
+        return;
+      }
+
+      // Fuera del subdominio admin: intenta login como cliente primero
       try {
         await login(correo, password, false);
         toast({ title: '¡Bienvenido!' });

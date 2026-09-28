@@ -8,10 +8,12 @@ export function middleware(request: NextRequest) {
   const isAdminSubdomain = hostname.includes('admin.dreamlifeperu.com') ||
                            hostname.startsWith('admin.');
 
-  // Si viene a admin.* y accede a /, redirigir a /dashboard
-  // (el layout (admin)/layout.tsx valida la sesión y redirige a /login si no está autenticado)
+  // Si viene a admin.* y accede a /, decidir según si hay sesión (cookie compartida
+  // .dreamlifeperu.com) para no mostrar un loader de por medio: con sesión va directo
+  // al dashboard, sin sesión va directo al login.
   if (isAdminSubdomain && pathname === '/') {
-    return NextResponse.redirect(new URL('/dashboard', request.url));
+    const hasSession = !!request.cookies.get('access_token')?.value;
+    return NextResponse.redirect(new URL(hasSession ? '/dashboard' : '/login', request.url));
   }
 
   // Si NO es subdominio admin pero intenta acceder a /admin, redirigir a admin.subdomain
