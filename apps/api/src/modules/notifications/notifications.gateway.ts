@@ -1,7 +1,7 @@
 import { WebSocketGateway, WebSocketServer, SubscribeMessage, MessageBody, ConnectedSocket, OnGatewayConnection, OnGatewayDisconnect } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
-import { corsOriginCallback } from '@/common/utils/cors-origins.util';
+import { corsOriginCallback } from '../../common/utils/cors-origins.util';
 
 @WebSocketGateway({ cors: { origin: corsOriginCallback, credentials: true } })
 export class NotificationsGateway implements OnGatewayConnection, OnGatewayDisconnect {
