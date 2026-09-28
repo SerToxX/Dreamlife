@@ -32,7 +32,7 @@ export class ProductsService {
         include: {
           categoria: true,
           imagenes: { orderBy: { orden: 'asc' }, take: 1 },
-          items: { where: { activo: true }, include: { variante: true, diseno: true, stocks: { include: { ubicacion: true } }, ofertaItems: { include: { oferta: true } } } },
+          items: { where: { activo: true }, include: { variante: true, diseno: true, stocks: true, ofertaItems: { include: { oferta: true } } } },
         },
         orderBy: { createdAt: 'desc' },
       }),
@@ -47,7 +47,7 @@ export class ProductsService {
         categoria: true,
         imagenes: { orderBy: { orden: 'asc' } },
         variantes: true,
-        items: { where: { activo: true }, include: { variante: true, diseno: true, imagenes: true, stocks: { include: { ubicacion: true } }, liquidaciones: { where: { activa: true } }, ofertaItems: { include: { oferta: true } } } },
+        items: { where: { activo: true }, include: { variante: true, diseno: true, imagenes: true, stocks: true, liquidaciones: { where: { activa: true } }, ofertaItems: { include: { oferta: true } } } },
       },
     });
     if (!product) throw new NotFoundException(`Producto #${id} no encontrado`);
