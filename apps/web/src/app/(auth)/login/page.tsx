@@ -33,21 +33,11 @@ export default function LoginPage() {
         return;
       }
 
-      // Fuera del subdominio admin: intenta login como cliente primero
-      try {
-        await login(correo, password, false);
-        toast({ title: '¡Bienvenido!' });
-        router.push('/');
-        return;
-      } catch {
-        // Si falla, intenta como admin
-        await login(correo, password, true);
-        toast({ title: '¡Bienvenido al panel administrativo!' });
-        // Redirige a admin.dreamlifeperu.com
-        const protocol = typeof window !== 'undefined' ? window.location.protocol : 'https:';
-        const adminDomain = `${protocol}//admin.dreamlifeperu.com`;
-        window.location.href = adminDomain + '/dashboard';
-      }
+      // Fuera del subdominio admin: SOLO se permite login de cliente.
+      // Un admin/trabajador debe ir a admin.dreamlifeperu.com/login a autenticarse.
+      await login(correo, password, false);
+      toast({ title: '¡Bienvenido!' });
+      router.push('/');
     } catch {
       toast({ title: 'Error al iniciar sesión', description: 'Credenciales inválidas', variant: 'destructive' });
     } finally {
