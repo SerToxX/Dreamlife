@@ -9,13 +9,9 @@ export function middleware(request: NextRequest) {
                            hostname.startsWith('admin.');
 
   // Si viene a admin.* y accede a /, redirigir a /dashboard
+  // (el layout (admin)/layout.tsx valida la sesión y redirige a /login si no está autenticado)
   if (isAdminSubdomain && pathname === '/') {
     return NextResponse.redirect(new URL('/dashboard', request.url));
-  }
-
-  // Si viene a admin.* pero no es ruta admin ni login, redirigir al login
-  if (isAdminSubdomain && !pathname.startsWith('/admin') && !pathname.startsWith('/login')) {
-    return NextResponse.redirect(new URL('/login', request.url));
   }
 
   // Si NO es subdominio admin pero intenta acceder a /admin, redirigir a admin.subdomain

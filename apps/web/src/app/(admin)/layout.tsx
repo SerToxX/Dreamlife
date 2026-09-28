@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { Loader2, Menu, Home } from 'lucide-react';
 import { AdminSidebar } from '@/components/layout/admin-sidebar';
@@ -10,20 +10,31 @@ import { useRealtimeSync } from '@/hooks/use-realtime-sync';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
   const { isAuthenticated, user, hydrated } = useAuthStore();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   useRealtimeSync();
 
+  const isAccesoDenegado = pathname === '/acceso-denegado';
+
   useEffect(() => {
     if (!hydrated) return;
     if (!isAuthenticated) { router.replace('/login'); return; }
-    if (user?.type === 'cliente') router.replace('/acceso-denegado');
-  }, [hydrated, isAuthenticated, user, router]);
+    if (user?.type === 'cliente' && !isAccesoDenegado) { router.replace('/acceso-denegado'); return; }
+  }, [hydrated, isAuthenticated, user, router, isAccesoDenegado]);
 
   if (!hydrated) {
     return <div className="min-h-screen flex items-center justify-center bg-background"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>;
   }
-  if (!isAuthenticated || user?.type === 'cliente') return null;
+  if (!isAuthenticated) return null;
+
+  // Cliente autenticado en /acceso-denegado: renderiza la página sin el sidebar/topbar admin.
+  // No se puede usar router.replace aquí porque bloquearía el render de la propia página
+  // de acceso-denegado (quedaría en blanco: return null mientras redirige a sí misma).
+  if (user?.type === 'cliente') {
+    if (isAccesoDenegado) return <>{children}</>;
+    return null; // está siendo redirigido a /acceso-denegado por el effect
+  }
 
   return (
     <div className="flex min-h-screen bg-background">

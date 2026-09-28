@@ -1,5 +1,3 @@
-'use server';
-
 import { Logo } from '@/components/brand/logo';
 import { Card, CardContent } from '@/components/ui/card';
 import { PageHero } from '@/components/shared/page-hero';
