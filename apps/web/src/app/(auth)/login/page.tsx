@@ -16,16 +16,27 @@ export default function LoginPage() {
   const [correo, setCorreo] = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      await login(correo, password, isAdmin);
-      toast({ title: '¡Bienvenido!' });
-      router.push(isAdmin ? '/dashboard' : '/');
+      // Intenta login como cliente primero
+      try {
+        await login(correo, password, false);
+        toast({ title: '¡Bienvenido!' });
+        router.push('/');
+        return;
+      } catch {
+        // Si falla, intenta como admin
+        await login(correo, password, true);
+        toast({ title: '¡Bienvenido al panel administrativo!' });
+        // Redirige a admin.dreamlifeperu.com
+        const protocol = typeof window !== 'undefined' ? window.location.protocol : 'https:';
+        const adminDomain = `${protocol}//admin.dreamlifeperu.com`;
+        window.location.href = adminDomain + '/admin/dashboard';
+      }
     } catch {
       toast({ title: 'Error al iniciar sesión', description: 'Credenciales inválidas', variant: 'destructive' });
     } finally {
@@ -66,10 +77,6 @@ export default function LoginPage() {
                 </button>
               </div>
             </div>
-            <label className="flex items-center gap-2 cursor-pointer p-3 rounded-lg bg-secondary border border-border">
-              <input type="checkbox" checked={isAdmin} onChange={(e) => setIsAdmin(e.target.checked)} className="accent-foreground" />
-              <span className="text-sm">Soy administrador o trabajador</span>
-            </label>
             <Button type="submit" variant="gradient" size="lg" className="h-12" disabled={loading}>{loading ? 'Ingresando...' : 'Iniciar sesión'}</Button>
           </form>
           <div className="text-center mt-6 pt-6 border-t border-border">

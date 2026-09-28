@@ -1,8 +1,29 @@
+'use server';
+
 import { Logo } from '@/components/brand/logo';
 import { Card, CardContent } from '@/components/ui/card';
 import { PageHero } from '@/components/shared/page-hero';
+import { prisma } from '@/lib/db';
 
-export default function SobreNosotros() {
+function formatNumber(num: number): string {
+  if (num >= 1000) {
+    return `${Math.floor(num / 1000)}K+`;
+  }
+  if (num >= 100) {
+    return '100+';
+  }
+  return num.toString();
+}
+
+export default async function SobreNosotros() {
+  const [productCount, clientCount] = await Promise.all([
+    prisma.producto.count({ where: { activo: true } }),
+    prisma.cliente.count({ where: { activo: true } }),
+  ]);
+
+  const productsDisplay = formatNumber(productCount);
+  const clientsDisplay = formatNumber(clientCount);
+
   return (
     <div>
       <PageHero
@@ -30,8 +51,8 @@ export default function SobreNosotros() {
       </div>
 
       <div className="grid grid-cols-3 gap-3 text-center">
-        <Card><CardContent className="p-5"><p className="text-2xl font-bold">2K+</p><p className="text-xs text-muted-foreground">Clientes felices</p></CardContent></Card>
-        <Card><CardContent className="p-5"><p className="text-2xl font-bold">500+</p><p className="text-xs text-muted-foreground">Productos</p></CardContent></Card>
+        <Card><CardContent className="p-5"><p className="text-2xl font-bold">{clientsDisplay}</p><p className="text-xs text-muted-foreground">Clientes felices</p></CardContent></Card>
+        <Card><CardContent className="p-5"><p className="text-2xl font-bold">{productsDisplay}</p><p className="text-xs text-muted-foreground">Productos</p></CardContent></Card>
         <Card><CardContent className="p-5"><p className="text-2xl font-bold">24/7</p><p className="text-xs text-muted-foreground">Soporte</p></CardContent></Card>
       </div>
       </div>

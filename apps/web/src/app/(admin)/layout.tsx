@@ -17,7 +17,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   useEffect(() => {
     if (!hydrated) return;
     if (!isAuthenticated) { router.replace('/login'); return; }
-    if (user?.type === 'cliente') router.replace('/');
+    if (user?.type === 'cliente') router.replace('/acceso-denegado');
   }, [hydrated, isAuthenticated, user, router]);
 
   if (!hydrated) {
