@@ -8,10 +8,8 @@ export function middleware(request: NextRequest) {
   const isAdminSubdomain = hostname.includes('admin.dreamlifeperu.com') ||
                            hostname.startsWith('admin.');
 
-  // Si viene a admin.* y accede a / (raíz), redirigir al dashboard admin
-  if (isAdminSubdomain && pathname === '/') {
-    return NextResponse.redirect(new URL('/admin/dashboard', request.url));
-  }
+  // Si viene a admin.* y accede a /, dejar que la página lo maneje
+  // (la página (admin)/page.tsx redirige a /dashboard, y el layout admin valida auth)
 
   // Si viene a admin.* pero no es ruta admin ni login, redirigir al login
   if (isAdminSubdomain && !pathname.startsWith('/admin') && !pathname.startsWith('/login') && pathname !== '/') {
@@ -22,6 +20,7 @@ export function middleware(request: NextRequest) {
   if (!isAdminSubdomain && pathname.startsWith('/admin')) {
     const adminUrl = request.nextUrl.clone();
     adminUrl.hostname = `admin.${request.nextUrl.hostname}`;
+    adminUrl.pathname = pathname.replace('/admin', '');
     return NextResponse.redirect(adminUrl);
   }
 

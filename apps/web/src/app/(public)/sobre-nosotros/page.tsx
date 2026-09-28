@@ -1,8 +1,28 @@
+'use server';
+
 import { Logo } from '@/components/brand/logo';
 import { Card, CardContent } from '@/components/ui/card';
 import { PageHero } from '@/components/shared/page-hero';
 
-export default function SobreNosotros() {
+function formatNumber(num: number): string {
+  if (num >= 1000) return `${Math.floor(num / 100) / 10}K+`;
+  return num.toString();
+}
+
+async function getStats() {
+  try {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+    const res = await fetch(`${apiUrl}/products/stats/public`, { cache: 'revalidate' });
+    if (!res.ok) throw new Error('Failed to fetch stats');
+    return res.json();
+  } catch {
+    return { productos: 0, clientes: 0 };
+  }
+}
+
+export default async function SobreNosotros() {
+  const stats = await getStats();
+
   return (
     <div>
       <PageHero
@@ -30,8 +50,8 @@ export default function SobreNosotros() {
       </div>
 
       <div className="grid grid-cols-3 gap-3 text-center">
-        <Card><CardContent className="p-5"><p className="text-2xl font-bold">2K+</p><p className="text-xs text-muted-foreground">Clientes felices</p></CardContent></Card>
-        <Card><CardContent className="p-5"><p className="text-2xl font-bold">500+</p><p className="text-xs text-muted-foreground">Productos</p></CardContent></Card>
+        <Card><CardContent className="p-5"><p className="text-2xl font-bold">{formatNumber(stats.clientes)}</p><p className="text-xs text-muted-foreground">Clientes felices</p></CardContent></Card>
+        <Card><CardContent className="p-5"><p className="text-2xl font-bold">{formatNumber(stats.productos)}</p><p className="text-xs text-muted-foreground">Productos</p></CardContent></Card>
         <Card><CardContent className="p-5"><p className="text-2xl font-bold">24/7</p><p className="text-xs text-muted-foreground">Soporte</p></CardContent></Card>
       </div>
       </div>

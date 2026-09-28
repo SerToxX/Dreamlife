@@ -35,7 +35,7 @@ export default function LoginPage() {
         // Redirige a admin.dreamlifeperu.com
         const protocol = typeof window !== 'undefined' ? window.location.protocol : 'https:';
         const adminDomain = `${protocol}//admin.dreamlifeperu.com`;
-        window.location.href = adminDomain + '/admin/dashboard';
+        window.location.href = adminDomain + '/dashboard';
       }
     } catch {
       toast({ title: 'Error al iniciar sesión', description: 'Credenciales inválidas', variant: 'destructive' });

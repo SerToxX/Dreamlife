@@ -138,4 +138,12 @@ export class ProductsService {
     this.gateway.emitPublicSync('productos', { productoId });
     return item;
   }
+
+  async getPublicStats() {
+    const [productCount, clientCount] = await Promise.all([
+      this.prisma.producto.count({ where: { activo: true } }),
+      this.prisma.cliente.count(),
+    ]);
+    return { productos: productCount, clientes: clientCount };
+  }
 }

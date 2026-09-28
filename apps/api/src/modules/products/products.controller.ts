@@ -28,6 +28,9 @@ export class ProductsController {
   @Public() @Get('featured')
   getFeatured() { return this.productsService.getFeatured(); }
 
+  @Public() @Get('stats/public')
+  getPublicStats() { return this.productsService.getPublicStats(); }
+
   // Buscador liviano de SKUs, usado por el admin al armar una campaña de ofertas
   @Get('items/search')
   @UseGuards(AuthGuard('jwt'), RolesGuard) @Roles('admin', 'worker')
