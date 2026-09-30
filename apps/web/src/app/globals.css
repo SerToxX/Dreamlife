@@ -102,6 +102,14 @@
   animation: soft-pulse 2.4s cubic-bezier(0.2, 0.6, 0.4, 1) infinite;
 }
 
+/* ── Tuerca girando en la pantalla de mantenimiento ── */
+@keyframes spin-slow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.animate-spin-slow { animation: spin-slow 3.5s linear infinite; }
+@keyframes spin-slow-reverse { from { transform: rotate(360deg); } to { transform: rotate(0deg); } }
+.animate-spin-slow-reverse { animation: spin-slow-reverse 4.5s linear infinite; }
+@keyframes float-y { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+.animate-float-y { animation: float-y 3s ease-in-out infinite; }
+
 /* ── Inputs de fecha nativos: el ícono de calendario del navegador es negro
    por defecto y se pierde sobre fondos oscuros. Lo invertimos en dark mode. ── */
 input[type='date']::-webkit-calendar-picker-indicator {

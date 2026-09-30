@@ -721,3 +721,18 @@ model Contacto {
 
   @@map("contacto")
 }
+
+// ─────────────────────────────────────────────
+// CONFIGURACIÓN DEL SISTEMA
+// ─────────────────────────────────────────────
+
+// Fila única (id fijo = 1) con ajustes globales del sitio, como el modo
+// mantenimiento que el admin puede prender/apagar desde el panel.
+model ConfiguracionSistema {
+  id                   Int      @id @default(1)
+  mantenimientoActivo  Boolean  @default(false)
+  mantenimientoMensaje String?  @db.VarChar(255)
+  actualizadoEn        DateTime @updatedAt
+
+  @@map("configuracion_sistema")
+}
