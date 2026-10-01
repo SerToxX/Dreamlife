@@ -10,16 +10,27 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { formatPrice, getPrecioConDescuento } from '@/lib/utils';
 import { toast } from '@/components/ui/toaster';
+import { ProductSlider } from '@/components/features/products/product-slider';
 
 export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
   const addItem = useCartStore((s) => s.addItem);
   const [selected, setSelected] = useState<number | null>(null);
   const [qty, setQty] = useState(1);
+  const [descExpanded, setDescExpanded] = useState(false);
 
   const { data: prod, isLoading } = useQuery({
     queryKey: ['prod', id],
     queryFn: () => api.get(`/products/${id}`).then((r) => r.data),
+  });
+
+  const { data: recomendados } = useQuery({
+    queryKey: ['prod-recomendados', id, prod?.categoria?.id],
+    queryFn: () =>
+      api
+        .get('/products', { params: { categoriaId: prod?.categoria?.id, limit: 11 } })
+        .then((r) => r.data),
+    enabled: !!prod?.categoria?.id,
   });
 
   if (isLoading) return <div className="container mx-auto py-24 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>;
@@ -50,9 +61,9 @@ export default function ProductDetailPage() {
           )}
         </div>
 
-        <div>
+        <div className="min-w-0">
           {prod.categoria && <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">{prod.categoria.nombre}</p>}
-          <h1 className="text-3xl md:text-4xl font-bold mb-3 text-balance">{prod.nombre}</h1>
+          <h1 className="text-3xl md:text-4xl font-bold mb-3 text-balance break-words">{prod.nombre}</h1>
           {currentItem?.codigoSku && <p className="text-xs font-mono text-muted-foreground mb-3">SKU: {currentItem.codigoSku}</p>}
           <div className="flex items-center gap-3 mb-5">
             {oferta && <span className="text-lg text-muted-foreground line-through">{formatPrice(precioOriginal)}</span>}
@@ -64,7 +75,23 @@ export default function ProductDetailPage() {
             )}
           </div>
 
-          {prod.descripcion && <p className="text-muted-foreground mb-6 leading-relaxed">{prod.descripcion}</p>}
+          {prod.descripcion && (
+            <div className="mb-6">
+              <p
+                className={`text-muted-foreground leading-relaxed break-words whitespace-pre-line ${descExpanded ? '' : 'line-clamp-5'}`}
+              >
+                {prod.descripcion}
+              </p>
+              {prod.descripcion.length > 260 && (
+                <button
+                  onClick={() => setDescExpanded((v) => !v)}
+                  className="text-sm font-medium text-foreground hover:underline mt-1"
+                >
+                  {descExpanded ? 'Ver menos' : 'Ver más'}
+                </button>
+              )}
+            </div>
+          )}
 
           {prod.items?.length > 1 && (
             <div className="mb-5">
@@ -103,6 +130,11 @@ export default function ProductDetailPage() {
           </Card>
         </div>
       </div>
+
+      <ProductSlider
+        title="Productos recomendados"
+        products={(recomendados?.data ?? []).filter((p: any) => p.id !== prod.id).slice(0, 10)}
+      />
     </div>
   );
 }
