@@ -9,7 +9,7 @@ import { revalidateWebPath } from '../../common/utils/revalidate.util';
 export class ProductsService {
   constructor(private prisma: PrismaService, private gateway: NotificationsGateway) {}
 
-  async findAll(query: { page?: number; limit?: number; search?: string; categoriaId?: number; destacado?: boolean; minPrecio?: number; maxPrecio?: number }) {
+  async findAll(query: { page?: number; limit?: number; search?: string; categoriaId?: number | string; destacado?: boolean; minPrecio?: number; maxPrecio?: number }) {
     const page = Number(query.page) || 1;
     const limit = Number(query.limit) || 20;
     const skip = (page - 1) * limit;
@@ -24,9 +24,15 @@ export class ProductsService {
       ];
     }
     if (categoriaId) {
-      const catId = Number(categoriaId);
-      const hijos = await this.prisma.categoria.findMany({ where: { padreId: catId }, select: { id: true } });
-      where.categoriaId = hijos.length ? { in: [catId, ...hijos.map((h) => h.id)] } : catId;
+      const ids = String(categoriaId)
+        .split(',')
+        .map((v) => Number(v.trim()))
+        .filter((n) => !Number.isNaN(n));
+      if (ids.length) {
+        const hijos = await this.prisma.categoria.findMany({ where: { padreId: { in: ids } }, select: { id: true } });
+        const allIds = Array.from(new Set([...ids, ...hijos.map((h) => h.id)]));
+        where.categoriaId = allIds.length > 1 ? { in: allIds } : allIds[0];
+      }
     }
     if (destacado !== undefined) where.destacado = destacado;
     if (minPrecio !== undefined || maxPrecio !== undefined) {

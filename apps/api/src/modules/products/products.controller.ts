@@ -19,7 +19,7 @@ export class ProductsController {
     @Query('page') page?: number,
     @Query('limit') limit?: number,
     @Query('search') search?: string,
-    @Query('categoriaId') categoriaId?: number,
+    @Query('categoriaId') categoriaId?: string,
     @Query('destacado') destacado?: boolean,
     @Query('minPrecio') minPrecio?: number,
     @Query('maxPrecio') maxPrecio?: number,

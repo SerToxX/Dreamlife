@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
@@ -27,14 +27,17 @@ export default function ProductDetailPage() {
 
   useEffect(() => { setActiveImg(0); }, [id]);
 
-  const { data: recomendados } = useQuery({
-    queryKey: ['prod-recomendados', id, prod?.categoria?.id],
-    queryFn: () =>
-      api
-        .get('/products', { params: { categoriaId: prod?.categoria?.id, limit: 11 } })
-        .then((r) => r.data),
-    enabled: !!prod?.categoria?.id,
+  const { data: poolProductos } = useQuery({
+    queryKey: ['prod-recomendados-pool'],
+    queryFn: () => api.get('/products', { params: { limit: 40 } }).then((r) => r.data),
+    staleTime: 60_000,
   });
+
+  const recomendados = useMemo(() => {
+    const pool = (poolProductos?.data ?? []).filter((p: any) => p.id !== prod?.id);
+    const shuffled = [...pool].sort(() => Math.random() - 0.5);
+    return shuffled.slice(0, 10);
+  }, [poolProductos, prod?.id]);
 
   if (isLoading) return <div className="container mx-auto py-24 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>;
   if (!prod) return <div className="container mx-auto py-24 text-center"><p className="text-muted-foreground">Producto no encontrado</p></div>;
@@ -154,10 +157,7 @@ export default function ProductDetailPage() {
         </div>
       </div>
 
-      <ProductSlider
-        title="Productos recomendados"
-        products={(recomendados?.data ?? []).filter((p: any) => p.id !== prod.id).slice(0, 10)}
-      />
+      <ProductSlider title="Productos recomendados" products={recomendados} />
     </div>
   );
 }

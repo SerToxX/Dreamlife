@@ -1,5 +1,5 @@
 'use client';
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { Search, X, SlidersHorizontal } from 'lucide-react';
@@ -10,64 +10,95 @@ import { ProductCard } from '@/components/features/products/product-card';
 import { PageHero } from '@/components/shared/page-hero';
 import { Logo } from '@/components/brand/logo';
 
-const PRICE_PRESETS = [
-  { label: 'Hasta S/ 50', min: '', max: '50' },
-  { label: 'S/ 50 - S/ 100', min: '50', max: '100' },
-  { label: 'S/ 100 - S/ 200', min: '100', max: '200' },
-  { label: 'Más de S/ 200', min: '200', max: '' },
-];
+const MIN_PRICE = 0;
+const MAX_PRICE = 500;
+const PRICE_STEP = 10;
 
 function FiltersPanel({
+  showTitle = true,
   cats,
-  categoriaId,
-  onSelectCategoria,
-  minPrecioInput,
-  maxPrecioInput,
-  setMinPrecioInput,
-  setMaxPrecioInput,
-  onApplyPrecio,
-  onPreset,
-  activePreset,
+  categoriaIds,
+  onToggleCategoria,
+  priceRange,
+  onChangePrice,
   onClear,
   hasActiveFilters,
 }: any) {
+  const pctMin = ((priceRange[0] - MIN_PRICE) / (MAX_PRICE - MIN_PRICE)) * 100;
+  const pctMax = ((priceRange[1] - MIN_PRICE) / (MAX_PRICE - MIN_PRICE)) * 100;
+
   return (
     <div className="space-y-7">
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-semibold">Categorías</h3>
+      {showTitle && (
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold">Filtros</h2>
+          {hasActiveFilters && (
+            <button onClick={onClear} className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1">
+              <X className="w-3 h-3" />Limpiar
+            </button>
+          )}
         </div>
-        <div className="space-y-1">
-          <button
-            onClick={() => onSelectCategoria(null)}
-            className={`w-full text-left px-2.5 py-1.5 rounded-md text-sm transition-colors ${
-              categoriaId === null ? 'bg-secondary font-medium text-foreground' : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground'
-            }`}
-          >
-            Todas las categorías
-          </button>
+      )}
+
+      <div>
+        <h3 className="text-sm font-semibold mb-4">Precio</h3>
+        <div className="dual-range">
+          <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 h-1 rounded-full bg-border" />
+          <div
+            className="absolute top-1/2 -translate-y-1/2 h-1 rounded-full bg-foreground"
+            style={{ left: `${pctMin}%`, right: `${100 - pctMax}%` }}
+          />
+          <input
+            type="range"
+            aria-label="Precio mínimo"
+            min={MIN_PRICE}
+            max={MAX_PRICE}
+            step={PRICE_STEP}
+            value={priceRange[0]}
+            onChange={(e) => onChangePrice([Math.min(Number(e.target.value), priceRange[1] - PRICE_STEP), priceRange[1]])}
+          />
+          <input
+            type="range"
+            aria-label="Precio máximo"
+            min={MIN_PRICE}
+            max={MAX_PRICE}
+            step={PRICE_STEP}
+            value={priceRange[1]}
+            onChange={(e) => onChangePrice([priceRange[0], Math.max(Number(e.target.value), priceRange[0] + PRICE_STEP)])}
+          />
+        </div>
+        <div className="flex items-center justify-between text-sm text-muted-foreground mt-2">
+          <span>S/ {priceRange[0]}</span>
+          <span>S/ {priceRange[1]}{priceRange[1] === MAX_PRICE ? '+' : ''}</span>
+        </div>
+      </div>
+
+      <div>
+        <h3 className="text-sm font-semibold mb-3">Categoría</h3>
+        <div className="space-y-2">
           {cats?.map((parent: any) => (
             <div key={parent.id}>
-              <button
-                onClick={() => onSelectCategoria(parent.id)}
-                className={`w-full text-left px-2.5 py-1.5 rounded-md text-sm transition-colors ${
-                  categoriaId === parent.id ? 'bg-secondary font-medium text-foreground' : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground'
-                }`}
-              >
-                {parent.nombre}
-              </button>
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 rounded border-border accent-foreground"
+                  checked={categoriaIds.includes(parent.id)}
+                  onChange={() => onToggleCategoria(parent.id)}
+                />
+                <span>{parent.nombre}</span>
+              </label>
               {parent.hijos?.length > 0 && (
-                <div className="ml-3 mt-0.5 mb-1 space-y-0.5 border-l border-border pl-3">
+                <div className="ml-6 mt-2 space-y-2">
                   {parent.hijos.map((child: any) => (
-                    <button
-                      key={child.id}
-                      onClick={() => onSelectCategoria(child.id)}
-                      className={`w-full text-left px-2 py-1.5 rounded-md text-sm transition-colors ${
-                        categoriaId === child.id ? 'bg-secondary font-medium text-foreground' : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground'
-                      }`}
-                    >
-                      {child.nombre}
-                    </button>
+                    <label key={child.id} className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="w-4 h-4 rounded border-border accent-foreground"
+                        checked={categoriaIds.includes(child.id)}
+                        onChange={() => onToggleCategoria(child.id)}
+                      />
+                      <span>{child.nombre}</span>
+                    </label>
                   ))}
                 </div>
               )}
@@ -76,48 +107,7 @@ function FiltersPanel({
         </div>
       </div>
 
-      <div>
-        <h3 className="text-sm font-semibold mb-3">Precio</h3>
-        <div className="flex items-center gap-2 mb-3">
-          <Input
-            type="number"
-            min={0}
-            placeholder="Mín"
-            value={minPrecioInput}
-            onChange={(e) => setMinPrecioInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && onApplyPrecio()}
-            className="h-9 text-sm"
-          />
-          <span className="text-muted-foreground text-sm">-</span>
-          <Input
-            type="number"
-            min={0}
-            placeholder="Máx"
-            value={maxPrecioInput}
-            onChange={(e) => setMaxPrecioInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && onApplyPrecio()}
-            className="h-9 text-sm"
-          />
-        </div>
-        <Button size="sm" variant="outline" className="w-full mb-3" onClick={onApplyPrecio}>
-          Aplicar precio
-        </Button>
-        <div className="flex flex-col gap-1.5">
-          {PRICE_PRESETS.map((p) => (
-            <button
-              key={p.label}
-              onClick={() => onPreset(p)}
-              className={`text-left px-2.5 py-1.5 rounded-md text-sm transition-colors ${
-                activePreset === p.label ? 'bg-secondary font-medium text-foreground' : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground'
-              }`}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {hasActiveFilters && (
+      {!showTitle && hasActiveFilters && (
         <Button variant="ghost" size="sm" className="w-full gap-2" onClick={onClear}>
           <X className="w-3.5 h-3.5" />Limpiar filtros
         </Button>
@@ -138,12 +128,11 @@ function CatalogoContent() {
   const searchParams = useSearchParams();
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
-  const [categoriaId, setCategoriaId] = useState<number | null>(null);
-  const [minPrecioInput, setMinPrecioInput] = useState('');
-  const [maxPrecioInput, setMaxPrecioInput] = useState('');
-  const [minPrecio, setMinPrecio] = useState('');
-  const [maxPrecio, setMaxPrecio] = useState('');
+  const [categoriaIds, setCategoriaIds] = useState<number[]>([]);
+  const [priceRange, setPriceRange] = useState<[number, number]>([MIN_PRICE, MAX_PRICE]);
+  const [appliedPrice, setAppliedPrice] = useState<[number, number]>([MIN_PRICE, MAX_PRICE]);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const priceDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const s = searchParams.get('search');
@@ -153,59 +142,57 @@ function CatalogoContent() {
     }
   }, [searchParams]);
 
+  useEffect(() => () => { if (priceDebounce.current) clearTimeout(priceDebounce.current); }, []);
+
   const { data: cats } = useQuery({ queryKey: ['cats-tree'], queryFn: () => api.get('/categories/tree').then((r) => r.data) });
   const { data, isLoading } = useQuery({
-    queryKey: ['products', search, page, categoriaId, minPrecio, maxPrecio],
+    queryKey: ['products', search, page, categoriaIds, appliedPrice],
     queryFn: () =>
       api
-        .get('/products', { params: { search, page, limit: 12, categoriaId, minPrecio: minPrecio || undefined, maxPrecio: maxPrecio || undefined } })
+        .get('/products', {
+          params: {
+            search,
+            page,
+            limit: 12,
+            categoriaId: categoriaIds.length ? categoriaIds.join(',') : undefined,
+            minPrecio: appliedPrice[0] > MIN_PRICE ? appliedPrice[0] : undefined,
+            maxPrecio: appliedPrice[1] < MAX_PRICE ? appliedPrice[1] : undefined,
+          },
+        })
         .then((r) => r.data),
     staleTime: 15_000,
   });
 
-  const activePreset = PRICE_PRESETS.find((p) => p.min === minPrecio && p.max === maxPrecio)?.label;
-  const hasActiveFilters = categoriaId !== null || !!minPrecio || !!maxPrecio || !!search;
+  const hasActiveFilters = categoriaIds.length > 0 || appliedPrice[0] > MIN_PRICE || appliedPrice[1] < MAX_PRICE || !!search;
 
-  const selectCategoria = (id: number | null) => {
-    setCategoriaId(id);
+  const toggleCategoria = (id: number) => {
+    setCategoriaIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
     setPage(1);
   };
 
-  const applyPrecio = () => {
-    setMinPrecio(minPrecioInput);
-    setMaxPrecio(maxPrecioInput);
-    setPage(1);
-  };
-
-  const selectPreset = (p: { label: string; min: string; max: string }) => {
-    setMinPrecioInput(p.min);
-    setMaxPrecioInput(p.max);
-    setMinPrecio(p.min);
-    setMaxPrecio(p.max);
-    setPage(1);
+  const changePrice = (next: [number, number]) => {
+    setPriceRange(next);
+    if (priceDebounce.current) clearTimeout(priceDebounce.current);
+    priceDebounce.current = setTimeout(() => {
+      setAppliedPrice(next);
+      setPage(1);
+    }, 400);
   };
 
   const clearFilters = () => {
     setSearch('');
-    setCategoriaId(null);
-    setMinPrecioInput('');
-    setMaxPrecioInput('');
-    setMinPrecio('');
-    setMaxPrecio('');
+    setCategoriaIds([]);
+    setPriceRange([MIN_PRICE, MAX_PRICE]);
+    setAppliedPrice([MIN_PRICE, MAX_PRICE]);
     setPage(1);
   };
 
   const filterProps = {
     cats,
-    categoriaId,
-    onSelectCategoria: selectCategoria,
-    minPrecioInput,
-    maxPrecioInput,
-    setMinPrecioInput,
-    setMaxPrecioInput,
-    onApplyPrecio: applyPrecio,
-    onPreset: selectPreset,
-    activePreset,
+    categoriaIds,
+    onToggleCategoria: toggleCategoria,
+    priceRange,
+    onChangePrice: changePrice,
     onClear: clearFilters,
     hasActiveFilters,
   };
@@ -238,7 +225,7 @@ function CatalogoContent() {
           </Button>
         </div>
 
-        <div className="lg:grid lg:grid-cols-[240px_1fr] lg:gap-8">
+        <div className="lg:grid lg:grid-cols-[240px_1fr] lg:gap-10">
           <aside className="hidden lg:block">
             <FiltersPanel {...filterProps} />
           </aside>
@@ -254,7 +241,7 @@ function CatalogoContent() {
                   </Button>
                 </div>
                 <div className="flex-1 overflow-y-auto px-4 py-4">
-                  <FiltersPanel {...filterProps} />
+                  <FiltersPanel {...filterProps} showTitle={false} />
                 </div>
                 <div className="p-4 border-t border-border flex-shrink-0">
                   <Button className="w-full" onClick={() => setFiltersOpen(false)}>
