@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
@@ -18,11 +18,14 @@ export default function ProductDetailPage() {
   const [selected, setSelected] = useState<number | null>(null);
   const [qty, setQty] = useState(1);
   const [descExpanded, setDescExpanded] = useState(false);
+  const [activeImg, setActiveImg] = useState(0);
 
   const { data: prod, isLoading } = useQuery({
     queryKey: ['prod', id],
     queryFn: () => api.get(`/products/${id}`).then((r) => r.data),
   });
+
+  useEffect(() => { setActiveImg(0); }, [id]);
 
   const { data: recomendados } = useQuery({
     queryKey: ['prod-recomendados', id, prod?.categoria?.id],
@@ -38,7 +41,8 @@ export default function ProductDetailPage() {
 
   const currentItem = selected !== null ? prod.items?.[selected] : prod.items?.[0];
   const stock = currentItem?.stocks?.reduce((a: number, s: any) => a + s.cantidad, 0) ?? 0;
-  const imagen = prod.imagenes?.[0]?.url;
+  const imagenes = prod.imagenes ?? [];
+  const imagen = imagenes[activeImg]?.url ?? imagenes[0]?.url;
   const { precioFinal, precioOriginal, oferta } = getPrecioConDescuento(prod.precioBase, currentItem?.ofertaItems);
 
   const handleAdd = () => {
@@ -52,12 +56,31 @@ export default function ProductDetailPage() {
       <Link href="/catalogo" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-6"><ArrowLeft className="w-4 h-4" />Catálogo</Link>
 
       <div className="grid lg:grid-cols-2 gap-8 lg:gap-12">
-        <div className="aspect-square bg-secondary rounded-lg overflow-hidden relative">
-          {imagen ? <img src={imagen} alt={prod.nombre} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-6xl">🎌</div>}
-          {oferta && (
-            <span className="absolute top-3 right-3 bg-accent-2 text-white text-xs font-bold px-2.5 py-1.5 rounded flex items-center gap-1">
-              <Tag className="w-3 h-3" />{oferta.nombre}
-            </span>
+        <div>
+          <div className="aspect-square bg-secondary rounded-lg overflow-hidden relative">
+            {imagen ? <img src={imagen} alt={prod.nombre} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-6xl">🎌</div>}
+            {oferta && (
+              <span className="absolute top-3 right-3 bg-accent-2 text-white text-xs font-bold px-2.5 py-1.5 rounded flex items-center gap-1">
+                <Tag className="w-3 h-3" />{oferta.nombre}
+              </span>
+            )}
+          </div>
+
+          {imagenes.length > 1 && (
+            <div className="flex gap-2 mt-3 overflow-x-auto scrollbar-hide">
+              {imagenes.map((img: any, idx: number) => (
+                <button
+                  key={img.id ?? idx}
+                  onClick={() => setActiveImg(idx)}
+                  aria-label={`Ver imagen ${idx + 1}`}
+                  className={`flex-shrink-0 w-16 h-16 sm:w-20 sm:h-20 rounded-md overflow-hidden border-2 transition-colors ${
+                    activeImg === idx ? 'border-foreground' : 'border-transparent hover:border-muted-foreground'
+                  }`}
+                >
+                  <img src={img.url} alt={`${prod.nombre} ${idx + 1}`} className="w-full h-full object-cover" />
+                </button>
+              ))}
+            </div>
           )}
         </div>
 
