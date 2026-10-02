@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
-import { ShoppingCart, User, Menu, X, LogOut, Package, LayoutDashboard, UserCircle } from 'lucide-react';
+import { ShoppingCart, User, Menu, X, LogOut, Package, LayoutDashboard, UserCircle, Search } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useCartStore } from '@/stores/cart.store';
 import { useAuthStore } from '@/stores/auth.store';
@@ -24,7 +24,10 @@ export function Navbar() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const menuRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const count = useCartStore((s) => s.count());
   const { isAuthenticated, user, logout } = useAuthStore();
 
@@ -34,7 +37,16 @@ export function Navbar() {
     return () => document.removeEventListener('mousedown', h);
   }, []);
 
-  useEffect(() => { setMobileOpen(false); setMenuOpen(false); }, [pathname]);
+  useEffect(() => { setMobileOpen(false); setMenuOpen(false); setSearchOpen(false); }, [pathname]);
+  useEffect(() => { if (searchOpen) searchInputRef.current?.focus(); }, [searchOpen]);
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const q = searchQuery.trim();
+    setSearchOpen(false);
+    setSearchQuery('');
+    router.push(q ? `/catalogo?search=${encodeURIComponent(q)}` : '/catalogo');
+  };
 
   const handleLogout = async () => {
     await logout();
@@ -71,6 +83,10 @@ export function Navbar() {
         </nav>
 
         <div className="flex items-center gap-1.5">
+          <Button variant="ghost" size="icon" aria-label="Buscar productos" onClick={() => setSearchOpen((o) => !o)}>
+            {searchOpen ? <X className="w-4 h-4" /> : <Search className="w-4 h-4" />}
+          </Button>
+
           <ThemeToggle />
 
           <Link href="/carrito">
@@ -122,6 +138,22 @@ export function Navbar() {
           </Button>
         </div>
       </div>
+
+      {searchOpen && (
+        <div className="border-t border-border bg-background animate-in">
+          <form onSubmit={handleSearchSubmit} className="container mx-auto px-4 py-3 flex items-center gap-2">
+            <Search className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+            <input
+              ref={searchInputRef}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Buscar productos por nombre o SKU..."
+              className="flex-1 min-w-0 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            />
+            <Button type="submit" size="sm">Buscar</Button>
+          </form>
+        </div>
+      )}
 
       {mobileOpen && (
         <div className="lg:hidden border-t border-border bg-background animate-in">

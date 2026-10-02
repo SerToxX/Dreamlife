@@ -21,8 +21,10 @@ export class ProductsController {
     @Query('search') search?: string,
     @Query('categoriaId') categoriaId?: number,
     @Query('destacado') destacado?: boolean,
+    @Query('minPrecio') minPrecio?: number,
+    @Query('maxPrecio') maxPrecio?: number,
   ) {
-    return this.productsService.findAll({ page, limit, search, categoriaId, destacado });
+    return this.productsService.findAll({ page, limit, search, categoriaId, destacado, minPrecio, maxPrecio });
   }
 
   @Public() @Get('featured')

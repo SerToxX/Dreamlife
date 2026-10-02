@@ -9,11 +9,11 @@ import { revalidateWebPath } from '../../common/utils/revalidate.util';
 export class ProductsService {
   constructor(private prisma: PrismaService, private gateway: NotificationsGateway) {}
 
-  async findAll(query: { page?: number; limit?: number; search?: string; categoriaId?: number; destacado?: boolean }) {
+  async findAll(query: { page?: number; limit?: number; search?: string; categoriaId?: number; destacado?: boolean; minPrecio?: number; maxPrecio?: number }) {
     const page = Number(query.page) || 1;
     const limit = Number(query.limit) || 20;
     const skip = (page - 1) * limit;
-    const { search, categoriaId, destacado } = query;
+    const { search, categoriaId, destacado, minPrecio, maxPrecio } = query;
     const where: any = { activo: true };
     if (search && search.trim()) {
       const s = search.trim();
@@ -23,8 +23,17 @@ export class ProductsService {
         { items: { some: { codigoSku: { contains: s } } } },
       ];
     }
-    if (categoriaId) where.categoriaId = Number(categoriaId);
+    if (categoriaId) {
+      const catId = Number(categoriaId);
+      const hijos = await this.prisma.categoria.findMany({ where: { padreId: catId }, select: { id: true } });
+      where.categoriaId = hijos.length ? { in: [catId, ...hijos.map((h) => h.id)] } : catId;
+    }
     if (destacado !== undefined) where.destacado = destacado;
+    if (minPrecio !== undefined || maxPrecio !== undefined) {
+      where.precioBase = {};
+      if (minPrecio !== undefined && minPrecio !== null && `${minPrecio}` !== '') where.precioBase.gte = Number(minPrecio);
+      if (maxPrecio !== undefined && maxPrecio !== null && `${maxPrecio}` !== '') where.precioBase.lte = Number(maxPrecio);
+    }
     const [total, data] = await Promise.all([
       this.prisma.producto.count({ where }),
       this.prisma.producto.findMany({
