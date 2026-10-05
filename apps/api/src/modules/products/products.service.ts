@@ -35,10 +35,20 @@ export class ProductsService {
       }
     }
     if (destacado !== undefined) where.destacado = destacado;
-    if (minPrecio !== undefined || maxPrecio !== undefined) {
+    // Nota: no basta con chequear `!== undefined` — si el valor llega como
+    // string ("", "undefined", etc.) ese chequeo pasa igual y `Number(...)`
+    // puede dar NaN, que Prisma rechaza. Se valida el número ya convertido.
+    const toPrecio = (v: unknown): number | undefined => {
+      if (v === undefined || v === null || v === '') return undefined;
+      const n = Number(v);
+      return Number.isNaN(n) ? undefined : n;
+    };
+    const minP = toPrecio(minPrecio);
+    const maxP = toPrecio(maxPrecio);
+    if (minP !== undefined || maxP !== undefined) {
       where.precioBase = {};
-      if (minPrecio !== undefined && minPrecio !== null && `${minPrecio}` !== '') where.precioBase.gte = Number(minPrecio);
-      if (maxPrecio !== undefined && maxPrecio !== null && `${maxPrecio}` !== '') where.precioBase.lte = Number(maxPrecio);
+      if (minP !== undefined) where.precioBase.gte = minP;
+      if (maxP !== undefined) where.precioBase.lte = maxP;
     }
     const [total, productosRaw] = await Promise.all([
       this.prisma.producto.count({ where }),
