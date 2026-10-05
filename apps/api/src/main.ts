@@ -6,6 +6,7 @@ import helmet from 'helmet';
 import * as compression from 'compression';
 import { json, urlencoded } from 'express';
 import { corsOriginCallback } from './common/utils/cors-origins.util';
+import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 
 async function bootstrap() {
   // ── Falla rápido si van a producción con secretos de ejemplo ──
@@ -20,6 +21,13 @@ async function bootstrap() {
   }
 
   const app = await NestFactory.create(AppModule);
+
+  // ── Manejo global de errores ───────────────────────────
+  // Sin esto, cualquier excepción no controlada (ej. un error de Prisma)
+  // caía en el handler por defecto de Nest y devolvía un genérico
+  // "Internal server error" sin loguear el stack trace real, haciendo
+  // imposible diagnosticar fallas en producción.
+  app.useGlobalFilters(new AllExceptionsFilter());
 
   // ── Body size ──────────────────────────────────────────
   // El editor 3D de personalización envía imágenes y la vista previa

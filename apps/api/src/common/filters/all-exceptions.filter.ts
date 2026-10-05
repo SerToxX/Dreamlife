@@ -51,7 +51,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
       message = 'Faltan datos obligatorios o tienen un formato inválido';
     }
 
-    this.logger.error(`${request.method} ${request.url} → ${status}`, String(exception));
+    const stack = exception instanceof Error ? exception.stack : String(exception);
+    this.logger.error(`${request.method} ${request.url} → ${status}`, stack);
 
     response.status(status).json({
       statusCode: status,

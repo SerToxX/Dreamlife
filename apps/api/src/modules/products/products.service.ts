@@ -40,18 +40,31 @@ export class ProductsService {
       if (minPrecio !== undefined && minPrecio !== null && `${minPrecio}` !== '') where.precioBase.gte = Number(minPrecio);
       if (maxPrecio !== undefined && maxPrecio !== null && `${maxPrecio}` !== '') where.precioBase.lte = Number(maxPrecio);
     }
-    const [total, data] = await Promise.all([
+    const [total, productos] = await Promise.all([
       this.prisma.producto.count({ where }),
       this.prisma.producto.findMany({
         where, skip, take: limit,
         include: {
           categoria: true,
           imagenes: { orderBy: { orden: 'asc' }, take: 1 },
-          items: { where: { activo: true }, include: { variante: true, diseno: true, stocks: true, ofertaItems: { include: { oferta: true } } } },
         },
         orderBy: { createdAt: 'desc' },
       }),
     ]);
+
+    // Los items se traen aparte (en vez de anidados en el include de arriba):
+    // combinar paginación (skip/take) + un include anidado con 4 relaciones más
+    // (variante, diseno, stocks, ofertaItems->oferta) en una sola consulta
+    // causaba un 500 intermitente en producción. Separarlo en dos consultas
+    // más simples y unirlas en memoria es más robusto.
+    const items = productos.length
+      ? await this.prisma.productoItem.findMany({
+          where: { productoId: { in: productos.map((p) => p.id) }, activo: true },
+          include: { variante: true, diseno: true, stocks: true, ofertaItems: { include: { oferta: true } } },
+        })
+      : [];
+    const data = productos.map((p) => ({ ...p, items: items.filter((it) => it.productoId === p.id) }));
+
     return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 

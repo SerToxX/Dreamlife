@@ -1,8 +1,8 @@
 'use client';
-import { Suspense, useEffect, useRef, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { Search, X, SlidersHorizontal } from 'lucide-react';
+import { Search, X, SlidersHorizontal, Tag, Wallet, PackageSearch } from 'lucide-react';
 import api from '@/lib/api';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -14,105 +14,117 @@ const MIN_PRICE = 0;
 const MAX_PRICE = 500;
 const PRICE_STEP = 10;
 
-function FiltersPanel({
-  showTitle = true,
-  cats,
-  categoriaIds,
-  onToggleCategoria,
-  priceRange,
-  onChangePrice,
-  onClear,
-  hasActiveFilters,
-}: any) {
+function PriceSection({ priceRange, onChangePrice }: any) {
   const pctMin = ((priceRange[0] - MIN_PRICE) / (MAX_PRICE - MIN_PRICE)) * 100;
   const pctMax = ((priceRange[1] - MIN_PRICE) / (MAX_PRICE - MIN_PRICE)) * 100;
 
   return (
-    <div className="space-y-7">
-      {showTitle && (
-        <div className="flex items-center justify-between">
-          <h2 className="font-semibold">Filtros</h2>
-          {hasActiveFilters && (
-            <button onClick={onClear} className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1">
-              <X className="w-3 h-3" />Limpiar
-            </button>
-          )}
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-1.5 text-sm font-semibold">
+          <Wallet className="w-3.5 h-3.5 text-muted-foreground" />Precio
         </div>
-      )}
-
-      <div>
-        <h3 className="text-sm font-semibold mb-4">Precio</h3>
-        <div className="dual-range">
-          <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 h-1 rounded-full bg-border" />
-          <div
-            className="absolute top-1/2 -translate-y-1/2 h-1 rounded-full bg-foreground"
-            style={{ left: `${pctMin}%`, right: `${100 - pctMax}%` }}
-          />
-          <input
-            type="range"
-            aria-label="Precio mínimo"
-            min={MIN_PRICE}
-            max={MAX_PRICE}
-            step={PRICE_STEP}
-            value={priceRange[0]}
-            onChange={(e) => onChangePrice([Math.min(Number(e.target.value), priceRange[1] - PRICE_STEP), priceRange[1]])}
-          />
-          <input
-            type="range"
-            aria-label="Precio máximo"
-            min={MIN_PRICE}
-            max={MAX_PRICE}
-            step={PRICE_STEP}
-            value={priceRange[1]}
-            onChange={(e) => onChangePrice([priceRange[0], Math.max(Number(e.target.value), priceRange[0] + PRICE_STEP)])}
-          />
-        </div>
-        <div className="flex items-center justify-between text-sm text-muted-foreground mt-2">
-          <span>S/ {priceRange[0]}</span>
-          <span>S/ {priceRange[1]}{priceRange[1] === MAX_PRICE ? '+' : ''}</span>
-        </div>
+        <span className="text-xs font-medium text-muted-foreground tabular-nums">
+          S/{priceRange[0]} – S/{priceRange[1]}{priceRange[1] === MAX_PRICE ? '+' : ''}
+        </span>
       </div>
-
-      <div>
-        <h3 className="text-sm font-semibold mb-3">Categoría</h3>
-        <div className="space-y-2">
-          {cats?.map((parent: any) => (
-            <div key={parent.id}>
-              <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <input
-                  type="checkbox"
-                  className="w-4 h-4 rounded border-border accent-foreground"
-                  checked={categoriaIds.includes(parent.id)}
-                  onChange={() => onToggleCategoria(parent.id)}
-                />
-                <span>{parent.nombre}</span>
-              </label>
-              {parent.hijos?.length > 0 && (
-                <div className="ml-6 mt-2 space-y-2">
-                  {parent.hijos.map((child: any) => (
-                    <label key={child.id} className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
-                      <input
-                        type="checkbox"
-                        className="w-4 h-4 rounded border-border accent-foreground"
-                        checked={categoriaIds.includes(child.id)}
-                        onChange={() => onToggleCategoria(child.id)}
-                      />
-                      <span>{child.nombre}</span>
-                    </label>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
+      <div className="dual-range">
+        <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 h-1 rounded-full bg-border" />
+        <div
+          className="absolute top-1/2 -translate-y-1/2 h-1 rounded-full bg-gradient-to-r from-accent to-accent-2"
+          style={{ left: `${pctMin}%`, right: `${100 - pctMax}%` }}
+        />
+        <input
+          type="range"
+          aria-label="Precio mínimo"
+          min={MIN_PRICE}
+          max={MAX_PRICE}
+          step={PRICE_STEP}
+          value={priceRange[0]}
+          onChange={(e) => onChangePrice([Math.min(Number(e.target.value), priceRange[1] - PRICE_STEP), priceRange[1]])}
+        />
+        <input
+          type="range"
+          aria-label="Precio máximo"
+          min={MIN_PRICE}
+          max={MAX_PRICE}
+          step={PRICE_STEP}
+          value={priceRange[1]}
+          onChange={(e) => onChangePrice([priceRange[0], Math.max(Number(e.target.value), priceRange[0] + PRICE_STEP)])}
+        />
       </div>
-
-      {!showTitle && hasActiveFilters && (
-        <Button variant="ghost" size="sm" className="w-full gap-2" onClick={onClear}>
-          <X className="w-3.5 h-3.5" />Limpiar filtros
-        </Button>
-      )}
     </div>
+  );
+}
+
+function CategorySection({ cats, categoriaIds, onToggleCategoria }: any) {
+  return (
+    <div>
+      <div className="flex items-center gap-1.5 text-sm font-semibold mb-3">
+        <Tag className="w-3.5 h-3.5 text-muted-foreground" />Categoría
+      </div>
+      <div className="space-y-0.5">
+        {cats?.map((parent: any) => (
+          <div key={parent.id}>
+            <label
+              className={`flex items-center gap-2.5 text-sm rounded-md px-2 py-1.5 -mx-2 cursor-pointer transition-colors ${
+                categoriaIds.includes(parent.id) ? 'bg-secondary text-foreground' : 'hover:bg-secondary/60 text-foreground/90'
+              }`}
+            >
+              <input
+                type="checkbox"
+                className="w-4 h-4 rounded border-border accent-foreground flex-shrink-0"
+                checked={categoriaIds.includes(parent.id)}
+                onChange={() => onToggleCategoria(parent.id)}
+              />
+              <span className="truncate">{parent.nombre}</span>
+            </label>
+            {parent.hijos?.length > 0 && (
+              <div className="ml-[0.9rem] pl-3 mt-0.5 mb-1 space-y-0.5 border-l border-border">
+                {parent.hijos.map((child: any) => (
+                  <label
+                    key={child.id}
+                    className={`flex items-center gap-2.5 text-sm rounded-md px-2 py-1.5 -mx-2 cursor-pointer transition-colors ${
+                      categoriaIds.includes(child.id) ? 'bg-secondary text-foreground' : 'hover:bg-secondary/60 text-muted-foreground'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      className="w-3.5 h-3.5 rounded border-border accent-foreground flex-shrink-0"
+                      checked={categoriaIds.includes(child.id)}
+                      onChange={() => onToggleCategoria(child.id)}
+                    />
+                    <span className="truncate">{child.nombre}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function FiltersPanel({ cats, categoriaIds, onToggleCategoria, priceRange, onChangePrice }: any) {
+  return (
+    <div className="space-y-6">
+      <PriceSection priceRange={priceRange} onChangePrice={onChangePrice} />
+      <div className="h-px bg-border" />
+      <CategorySection cats={cats} categoriaIds={categoriaIds} onToggleCategoria={onToggleCategoria} />
+    </div>
+  );
+}
+
+function FilterChip({ label, onRemove }: { label: string; onRemove: () => void }) {
+  return (
+    <button
+      onClick={onRemove}
+      className="group inline-flex items-center gap-1.5 pl-3 pr-2 py-1.5 rounded-full border border-border bg-secondary text-xs font-medium hover:border-accent/40 transition-colors"
+    >
+      {label}
+      <X className="w-3 h-3 text-muted-foreground group-hover:text-foreground" />
+    </button>
   );
 }
 
@@ -144,6 +156,14 @@ function CatalogoContent() {
 
   useEffect(() => () => { if (priceDebounce.current) clearTimeout(priceDebounce.current); }, []);
 
+  // Bloquea el scroll del body mientras el drawer de filtros está abierto en mobile
+  useEffect(() => {
+    if (filtersOpen) {
+      document.body.style.overflow = 'hidden';
+      return () => { document.body.style.overflow = ''; };
+    }
+  }, [filtersOpen]);
+
   const { data: cats } = useQuery({ queryKey: ['cats-tree'], queryFn: () => api.get('/categories/tree').then((r) => r.data) });
   const { data, isLoading } = useQuery({
     queryKey: ['products', search, page, categoriaIds, appliedPrice],
@@ -163,7 +183,17 @@ function CatalogoContent() {
     staleTime: 15_000,
   });
 
+  const catNombre = useMemo(() => {
+    const map = new Map<number, string>();
+    cats?.forEach((parent: any) => {
+      map.set(parent.id, parent.nombre);
+      parent.hijos?.forEach((child: any) => map.set(child.id, child.nombre));
+    });
+    return map;
+  }, [cats]);
+
   const hasActiveFilters = categoriaIds.length > 0 || appliedPrice[0] > MIN_PRICE || appliedPrice[1] < MAX_PRICE || !!search;
+  const activeFilterCount = categoriaIds.length + (appliedPrice[0] > MIN_PRICE || appliedPrice[1] < MAX_PRICE ? 1 : 0) + (search ? 1 : 0);
 
   const toggleCategoria = (id: number) => {
     setCategoriaIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -179,6 +209,12 @@ function CatalogoContent() {
     }, 400);
   };
 
+  const resetPrice = () => {
+    setPriceRange([MIN_PRICE, MAX_PRICE]);
+    setAppliedPrice([MIN_PRICE, MAX_PRICE]);
+    setPage(1);
+  };
+
   const clearFilters = () => {
     setSearch('');
     setCategoriaIds([]);
@@ -187,15 +223,8 @@ function CatalogoContent() {
     setPage(1);
   };
 
-  const filterProps = {
-    cats,
-    categoriaIds,
-    onToggleCategoria: toggleCategoria,
-    priceRange,
-    onChangePrice: changePrice,
-    onClear: clearFilters,
-    hasActiveFilters,
-  };
+  const filterProps = { cats, categoriaIds, onToggleCategoria: toggleCategoria, priceRange, onChangePrice: changePrice };
+  const priceActive = appliedPrice[0] > MIN_PRICE || appliedPrice[1] < MAX_PRICE;
 
   return (
     <div>
@@ -220,31 +249,58 @@ function CatalogoContent() {
               }}
             />
           </div>
-          <Button variant="outline" className="lg:hidden gap-2 flex-shrink-0" onClick={() => setFiltersOpen(true)}>
+          <Button variant="outline" className="lg:hidden gap-2 flex-shrink-0 relative" onClick={() => setFiltersOpen(true)}>
             <SlidersHorizontal className="w-4 h-4" />Filtros
+            {activeFilterCount > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 flex items-center justify-center w-4 h-4 rounded-full bg-accent text-white text-[10px] font-bold leading-none">
+                {activeFilterCount}
+              </span>
+            )}
           </Button>
         </div>
 
-        <div className="lg:grid lg:grid-cols-[240px_1fr] lg:gap-10">
+        <div className="lg:grid lg:grid-cols-[260px_1fr] lg:gap-10">
           <aside className="hidden lg:block">
-            <FiltersPanel {...filterProps} />
+            <div className="sticky top-24 rounded-2xl border border-border bg-card/60 p-5">
+              <div className="flex items-center justify-between mb-5">
+                <h2 className="font-semibold flex items-center gap-2">
+                  Filtros
+                  {activeFilterCount > 0 && (
+                    <span className="flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded-full bg-accent text-white text-[10px] font-bold">
+                      {activeFilterCount}
+                    </span>
+                  )}
+                </h2>
+                {hasActiveFilters && (
+                  <button onClick={clearFilters} className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors">
+                    <X className="w-3 h-3" />Limpiar
+                  </button>
+                )}
+              </div>
+              <FiltersPanel {...filterProps} />
+            </div>
           </aside>
 
           {filtersOpen && (
             <div className="fixed inset-0 z-50 lg:hidden">
-              <div className="absolute inset-0 bg-black/50" onClick={() => setFiltersOpen(false)} />
-              <div className="absolute inset-y-0 left-0 w-[85%] max-w-sm bg-background flex flex-col animate-in">
+              <div className="absolute inset-0 bg-black/60 animate-in" onClick={() => setFiltersOpen(false)} />
+              <div className="absolute inset-y-0 left-0 w-[85%] max-w-sm bg-background flex flex-col animate-slide-in-left shadow-2xl">
                 <div className="flex items-center justify-between px-4 h-14 border-b border-border flex-shrink-0">
                   <h2 className="font-semibold">Filtros</h2>
-                  <Button variant="ghost" size="icon" onClick={() => setFiltersOpen(false)}>
+                  <Button variant="ghost" size="icon" onClick={() => setFiltersOpen(false)} aria-label="Cerrar filtros">
                     <X className="w-4 h-4" />
                   </Button>
                 </div>
-                <div className="flex-1 overflow-y-auto px-4 py-4">
-                  <FiltersPanel {...filterProps} showTitle={false} />
+                <div className="flex-1 overflow-y-auto px-4 py-5">
+                  <FiltersPanel {...filterProps} />
                 </div>
-                <div className="p-4 border-t border-border flex-shrink-0">
-                  <Button className="w-full" onClick={() => setFiltersOpen(false)}>
+                <div className="p-4 border-t border-border flex-shrink-0 flex gap-2">
+                  {hasActiveFilters && (
+                    <Button variant="outline" className="gap-2" onClick={clearFilters}>
+                      <X className="w-3.5 h-3.5" />Limpiar
+                    </Button>
+                  )}
+                  <Button className="flex-1" onClick={() => setFiltersOpen(false)}>
                     Ver resultados
                   </Button>
                 </div>
@@ -253,6 +309,18 @@ function CatalogoContent() {
           )}
 
           <div>
+            {hasActiveFilters && (
+              <div className="flex flex-wrap items-center gap-2 mb-5">
+                {search && <FilterChip label={`"${search}"`} onRemove={() => { setSearch(''); setPage(1); }} />}
+                {categoriaIds.map((id) => (
+                  <FilterChip key={id} label={catNombre.get(id) ?? `Categoría ${id}`} onRemove={() => toggleCategoria(id)} />
+                ))}
+                {priceActive && (
+                  <FilterChip label={`S/${appliedPrice[0]} – S/${appliedPrice[1]}${appliedPrice[1] === MAX_PRICE ? '+' : ''}`} onRemove={resetPrice} />
+                )}
+              </div>
+            )}
+
             {isLoading ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4">
                 {Array.from({ length: 8 }).map((_, i) => (
@@ -260,10 +328,16 @@ function CatalogoContent() {
                 ))}
               </div>
             ) : !data?.data?.length ? (
-              <div className="text-center py-16">
-                <p className="text-muted-foreground">No se encontraron productos</p>
+              <div className="flex flex-col items-center text-center py-20 px-4">
+                <div className="w-14 h-14 rounded-full bg-secondary flex items-center justify-center mb-4">
+                  <PackageSearch className="w-6 h-6 text-muted-foreground" />
+                </div>
+                <p className="font-medium mb-1">No se encontraron productos</p>
+                <p className="text-sm text-muted-foreground max-w-xs">
+                  {hasActiveFilters ? 'Prueba quitando algunos filtros o usando otros términos de búsqueda.' : 'Vuelve pronto, estamos agregando más merch al catálogo.'}
+                </p>
                 {hasActiveFilters && (
-                  <Button variant="outline" className="mt-4 gap-2" onClick={clearFilters}>
+                  <Button variant="outline" className="mt-5 gap-2" onClick={clearFilters}>
                     <X className="w-4 h-4" />Limpiar filtros
                   </Button>
                 )}

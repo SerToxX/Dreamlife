@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "gradient-text",
+        "value": "*",
+        "files": [
+          "apps/web/src/app/globals.css"
+        ],
+        "createdAt": "2026-10-05T21:34:04.526Z",
+        "reason": "pre-existing .text-gradient-brand utility, used site-wide for brand accents before this task; not introduced by this change, out of scope for a narrow catalog refinement"
+      }
+    ]
+  }
+}
