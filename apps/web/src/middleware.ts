@@ -9,6 +9,24 @@ const STATIC_FILE_RE = /\.[a-zA-Z0-9]+$/;
 let maintenanceCache: { activo: boolean; mensaje: string | null; ts: number } | null = null;
 const MAINTENANCE_CACHE_TTL_MS = 15000;
 
+// Decodifica el rol del JWT sin verificar su firma: solo se usa para dejar
+// pasar al admin durante el mantenimiento (una concesión de UX, no un
+// control de seguridad — las rutas y datos reales siguen protegidos por
+// los guards del backend). Edge runtime no tiene Buffer, se usa atob.
+function getRoleFromToken(token: string | undefined): string | null {
+  if (!token) return null;
+  try {
+    const payloadB64 = token.split('.')[1];
+    if (!payloadB64) return null;
+    const normalized = payloadB64.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4);
+    const payload = JSON.parse(atob(padded));
+    return typeof payload?.rol === 'string' ? payload.rol : null;
+  } catch {
+    return null;
+  }
+}
+
 // El panel admin llama al backend en cada toggle, así que basta con un caché
 // corto acá: evita pegarle a la API en cada request del sitio público sin
 // dejar el estado desactualizado por mucho tiempo si el admin lo prende/apaga.
@@ -63,7 +81,12 @@ export async function middleware(request: NextRequest) {
 
   if (!isAdminSubdomain && !isMaintenancePage && !isStaticFile) {
     const { activo, mensaje } = await getMaintenanceStatus();
-    if (activo) {
+    // El rol admin sigue viendo el sitio público normal aunque el
+    // mantenimiento esté activo (ej. para revisar cómo lo ven los clientes
+    // antes de desactivarlo). Cualquier otro rol, o sin sesión, ve la
+    // pantalla de mantenimiento igual que antes.
+    const role = getRoleFromToken(request.cookies.get('access_token')?.value);
+    if (activo && role !== 'admin') {
       const url = request.nextUrl.clone();
       url.pathname = '/mantenimiento';
       url.search = mensaje ? `?m=${encodeURIComponent(mensaje)}` : '';
