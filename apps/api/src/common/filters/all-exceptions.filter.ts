@@ -37,6 +37,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let message: any = 'Error interno del servidor';
+    let debug: string | undefined;
 
     if (exception instanceof HttpException) {
       status = exception.getStatus();
@@ -49,6 +50,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
     } else if (exception instanceof Prisma.PrismaClientValidationError) {
       status = HttpStatus.BAD_REQUEST;
       message = 'Faltan datos obligatorios o tienen un formato inválido';
+      // DEBUG TEMPORAL: exponer el mensaje real de Prisma para diagnosticar
+      // un 400 recurrente en /products que no se pudo reproducir en local.
+      // Quitar este bloque en cuanto esté identificado.
+      debug = exception.message.split('\n').map((l) => l.trim()).filter(Boolean).slice(-6).join(' | ');
     }
 
     const stack = exception instanceof Error ? exception.stack : String(exception);
@@ -59,6 +64,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       timestamp: new Date().toISOString(),
       path: request.url,
       message,
+      ...(debug ? { debug } : {}),
     });
   }
 }
