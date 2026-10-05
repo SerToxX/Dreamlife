@@ -1,8 +1,10 @@
 'use client';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
-import { ShoppingCart, User, Menu, X, LogOut, Package, LayoutDashboard, UserCircle, Search } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { ShoppingCart, User, Menu, X, LogOut, Package, LayoutDashboard, UserCircle, Search, ChevronDown, ChevronRight } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import api from '@/lib/api';
 import { useCartStore } from '@/stores/cart.store';
 import { useAuthStore } from '@/stores/auth.store';
 import { Button } from '@/components/ui/button';
@@ -12,7 +14,6 @@ import { toast } from '@/components/ui/toaster';
 import { cn } from '@/lib/utils';
 
 const NAV = [
-  { href: '/catalogo', label: 'Catálogo' },
   { href: '/personalizado', label: 'Personalizado' },
   { href: '/promociones', label: 'Ofertas' },
   { href: '/sobre-nosotros', label: 'Nosotros' },
@@ -22,14 +23,16 @@ const NAV = [
 export function Navbar() {
   const router = useRouter();
   const pathname = usePathname();
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [catalogoExpanded, setCatalogoExpanded] = useState(false);
+  const [expandedParentId, setExpandedParentId] = useState<number | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const menuRef = useRef<HTMLDivElement>(null);
-  const searchInputRef = useRef<HTMLInputElement>(null);
   const count = useCartStore((s) => s.count());
   const { isAuthenticated, user, logout } = useAuthStore();
+
+  const { data: cats } = useQuery({ queryKey: ['cats-tree'], queryFn: () => api.get('/categories/tree').then((r) => r.data) });
 
   useEffect(() => {
     const h = (e: MouseEvent) => menuRef.current && !menuRef.current.contains(e.target as Node) && setMenuOpen(false);
@@ -37,14 +40,23 @@ export function Navbar() {
     return () => document.removeEventListener('mousedown', h);
   }, []);
 
-  useEffect(() => { setMobileOpen(false); setMenuOpen(false); setSearchOpen(false); }, [pathname]);
-  useEffect(() => { if (searchOpen) searchInputRef.current?.focus(); }, [searchOpen]);
+  useEffect(() => {
+    setDrawerOpen(false);
+    setMenuOpen(false);
+    setCatalogoExpanded(false);
+    setExpandedParentId(null);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (drawerOpen) {
+      document.body.style.overflow = 'hidden';
+      return () => { document.body.style.overflow = ''; };
+    }
+  }, [drawerOpen]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const q = searchQuery.trim();
-    setSearchOpen(false);
-    setSearchQuery('');
     router.push(q ? `/catalogo?search=${encodeURIComponent(q)}` : '/catalogo');
   };
 
@@ -55,6 +67,8 @@ export function Navbar() {
     router.push('/');
   };
 
+  const closeDrawer = () => setDrawerOpen(false);
+
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-background/85 backdrop-blur-md">
       {/* Top bar promo */}
@@ -62,31 +76,30 @@ export function Navbar() {
         Envío gratis desde S/ 199 · 3 cuotas con Yape / Plin
       </div>
 
-      <div className="container mx-auto px-4 h-16 flex items-center justify-between gap-4">
+      <div className="container mx-auto px-4 h-16 flex items-center gap-2 sm:gap-3">
+        <Button variant="outline" className="gap-2 flex-shrink-0 px-2.5 sm:px-3" onClick={() => setDrawerOpen(true)} aria-label="Abrir menú" aria-expanded={drawerOpen}>
+          <Menu className="w-4 h-4" />
+          <span className="hidden sm:inline">Menú</span>
+        </Button>
+
         <Link href="/" className="flex-shrink-0">
-          <Logo size="md" />
+          <Logo size="sm" showText={false} />
         </Link>
 
-        <nav className="hidden lg:flex items-center gap-1">
-          {NAV.map((l) => (
-            <Link
-              key={l.href}
-              href={l.href}
-              className={cn(
-                'px-3 py-1.5 text-sm transition-colors',
-                pathname === l.href ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground'
-              )}
-            >
-              {l.label}
-            </Link>
-          ))}
-        </nav>
+        <div className="flex-1" />
 
-        <div className="flex items-center gap-1.5">
-          <Button variant="ghost" size="icon" aria-label="Buscar productos" onClick={() => setSearchOpen((o) => !o)}>
-            {searchOpen ? <X className="w-4 h-4" /> : <Search className="w-4 h-4" />}
-          </Button>
+        <form onSubmit={handleSearchSubmit} className="relative flex-1 min-w-[88px] max-w-[220px]">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-neutral-500 pointer-events-none" />
+          <input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Buscar..."
+            aria-label="Buscar productos por nombre o SKU"
+            className="w-full h-9 rounded-md bg-white text-neutral-900 placeholder:text-neutral-500 text-sm pl-8 pr-2 border border-black/10 shadow-sm focus:outline-none focus:ring-2 focus:ring-accent/50 transition-shadow"
+          />
+        </form>
 
+        <div className="flex items-center gap-1 flex-shrink-0">
           <ThemeToggle />
 
           <Link href="/carrito">
@@ -132,45 +145,92 @@ export function Navbar() {
           ) : (
             <Link href="/login"><Button size="sm">Ingresar</Button></Link>
           )}
-
-          <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setMobileOpen(!mobileOpen)}>
-            {mobileOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
-          </Button>
         </div>
       </div>
 
-      {searchOpen && (
-        <div className="border-t border-border bg-background animate-in">
-          <form onSubmit={handleSearchSubmit} className="container mx-auto px-4 py-3 flex items-center gap-2">
-            <Search className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-            <input
-              ref={searchInputRef}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Buscar productos por nombre o SKU..."
-              className="flex-1 min-w-0 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-            />
-            <Button type="submit" size="sm">Buscar</Button>
-          </form>
-        </div>
-      )}
+      {/* Drawer lateral: reemplaza la nav horizontal en todos los tamaños */}
+      {drawerOpen && (
+        <div className="fixed inset-0 z-50">
+          <div className="absolute inset-0 bg-black/60 animate-in" onClick={closeDrawer} />
+          <div className="absolute inset-y-0 left-0 w-[85%] max-w-sm bg-background flex flex-col animate-slide-in-left shadow-2xl">
+            <div className="flex items-center justify-between px-4 h-14 border-b border-border flex-shrink-0">
+              <Logo size="sm" />
+              <Button variant="ghost" size="icon" onClick={closeDrawer} aria-label="Cerrar menú">
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
 
-      {mobileOpen && (
-        <div className="lg:hidden border-t border-border bg-background animate-in">
-          <nav className="container mx-auto px-4 py-3 flex flex-col gap-1">
-            {NAV.map((l) => (
-              <Link
-                key={l.href}
-                href={l.href}
-                className={cn(
-                  'py-2.5 px-3 rounded-md text-sm',
-                  pathname === l.href ? 'text-foreground bg-secondary font-medium' : 'text-muted-foreground'
+            <nav className="flex-1 overflow-y-auto py-2">
+              {/* Catálogo: clic navega, la flecha (o el hover en desktop) despliega categorías */}
+              <div onMouseEnter={() => setCatalogoExpanded(true)}>
+                <div className={cn('flex items-center mx-2 rounded-md', (catalogoExpanded || pathname === '/catalogo') && 'bg-secondary')}>
+                  <Link href="/catalogo" onClick={closeDrawer} className="flex-1 px-3 py-2.5 text-sm font-medium">
+                    Catálogo
+                  </Link>
+                  <button
+                    onClick={() => setCatalogoExpanded((v) => !v)}
+                    className="px-3 py-2.5 text-muted-foreground hover:text-foreground"
+                    aria-label="Ver categorías del catálogo"
+                    aria-expanded={catalogoExpanded}
+                  >
+                    <ChevronDown className={cn('w-4 h-4 transition-transform', catalogoExpanded && 'rotate-180')} />
+                  </button>
+                </div>
+
+                {catalogoExpanded && (
+                  <div className="ml-6 pl-3 mr-2 mt-0.5 mb-1 space-y-0.5 border-l border-border">
+                    {cats?.map((parent: any) => (
+                      <div key={parent.id} onMouseEnter={() => setExpandedParentId(parent.id)}>
+                        <div className={cn('flex items-center rounded-md', expandedParentId === parent.id && 'bg-secondary')}>
+                          <Link href={`/catalogo?categoriaId=${parent.id}`} onClick={closeDrawer} className="flex-1 px-3 py-2 text-sm">
+                            {parent.nombre}
+                          </Link>
+                          {parent.hijos?.length > 0 && (
+                            <button
+                              onClick={() => setExpandedParentId((v) => (v === parent.id ? null : parent.id))}
+                              className="px-3 py-2 text-muted-foreground hover:text-foreground"
+                              aria-label={`Ver subcategorías de ${parent.nombre}`}
+                              aria-expanded={expandedParentId === parent.id}
+                            >
+                              <ChevronRight className={cn('w-3.5 h-3.5 transition-transform', expandedParentId === parent.id && 'rotate-90')} />
+                            </button>
+                          )}
+                        </div>
+                        {expandedParentId === parent.id && parent.hijos?.length > 0 && (
+                          <div className="ml-4 pl-3 mt-0.5 mb-1 space-y-0.5 border-l border-border">
+                            {parent.hijos.map((child: any) => (
+                              <Link
+                                key={child.id}
+                                href={`/catalogo?categoriaId=${child.id}`}
+                                onClick={closeDrawer}
+                                className="block px-3 py-2 text-sm text-muted-foreground hover:text-foreground"
+                              >
+                                {child.nombre}
+                              </Link>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 )}
-              >
-                {l.label}
-              </Link>
-            ))}
-          </nav>
+              </div>
+
+              {NAV.map((l) => (
+                <Link
+                  key={l.href}
+                  href={l.href}
+                  onClick={closeDrawer}
+                  className={cn(
+                    'block mx-2 px-3 py-2.5 rounded-md text-sm font-medium transition-colors',
+                    pathname === l.href ? 'text-foreground bg-secondary' : 'text-foreground/90 hover:bg-secondary/60'
+                  )}
+                >
+                  {l.label}
+                </Link>
+              ))}
+            </nav>
+          </div>
         </div>
       )}
     </header>

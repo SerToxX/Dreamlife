@@ -144,7 +144,7 @@ input[type='date']::-webkit-calendar-picker-indicator:hover {
   -webkit-appearance: none;
   width: 16px;
   height: 16px;
-  margin-top: 7px;
+  margin-top: -7px;
   border-radius: 9999px;
   background: hsl(var(--foreground));
   border: 2px solid hsl(var(--background));

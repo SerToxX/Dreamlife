@@ -2,7 +2,7 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { Search, X, SlidersHorizontal, Tag, Wallet, PackageSearch } from 'lucide-react';
+import { Search, X, SlidersHorizontal, Wallet, PackageSearch } from 'lucide-react';
 import api from '@/lib/api';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -11,12 +11,12 @@ import { PageHero } from '@/components/shared/page-hero';
 import { Logo } from '@/components/brand/logo';
 
 const MIN_PRICE = 0;
-const MAX_PRICE = 500;
 const PRICE_STEP = 10;
+const FALLBACK_MAX_PRICE = 500;
 
-function PriceSection({ priceRange, onChangePrice }: any) {
-  const pctMin = ((priceRange[0] - MIN_PRICE) / (MAX_PRICE - MIN_PRICE)) * 100;
-  const pctMax = ((priceRange[1] - MIN_PRICE) / (MAX_PRICE - MIN_PRICE)) * 100;
+function PriceSection({ priceRange, onChangePrice, maxPrice }: any) {
+  const pctMin = ((priceRange[0] - MIN_PRICE) / (maxPrice - MIN_PRICE)) * 100;
+  const pctMax = ((priceRange[1] - MIN_PRICE) / (maxPrice - MIN_PRICE)) * 100;
 
   return (
     <div>
@@ -25,7 +25,7 @@ function PriceSection({ priceRange, onChangePrice }: any) {
           <Wallet className="w-3.5 h-3.5 text-muted-foreground" />Precio
         </div>
         <span className="text-xs font-medium text-muted-foreground tabular-nums">
-          S/{priceRange[0]} – S/{priceRange[1]}{priceRange[1] === MAX_PRICE ? '+' : ''}
+          S/{priceRange[0]} – S/{priceRange[1]}{priceRange[1] === maxPrice ? '+' : ''}
         </span>
       </div>
       <div className="dual-range">
@@ -38,7 +38,7 @@ function PriceSection({ priceRange, onChangePrice }: any) {
           type="range"
           aria-label="Precio mínimo"
           min={MIN_PRICE}
-          max={MAX_PRICE}
+          max={maxPrice}
           step={PRICE_STEP}
           value={priceRange[0]}
           onChange={(e) => onChangePrice([Math.min(Number(e.target.value), priceRange[1] - PRICE_STEP), priceRange[1]])}
@@ -47,71 +47,12 @@ function PriceSection({ priceRange, onChangePrice }: any) {
           type="range"
           aria-label="Precio máximo"
           min={MIN_PRICE}
-          max={MAX_PRICE}
+          max={maxPrice}
           step={PRICE_STEP}
           value={priceRange[1]}
           onChange={(e) => onChangePrice([priceRange[0], Math.max(Number(e.target.value), priceRange[0] + PRICE_STEP)])}
         />
       </div>
-    </div>
-  );
-}
-
-function CategorySection({ cats, categoriaIds, onToggleCategoria }: any) {
-  return (
-    <div>
-      <div className="flex items-center gap-1.5 text-sm font-semibold mb-3">
-        <Tag className="w-3.5 h-3.5 text-muted-foreground" />Categoría
-      </div>
-      <div className="space-y-0.5">
-        {cats?.map((parent: any) => (
-          <div key={parent.id}>
-            <label
-              className={`flex items-center gap-2.5 text-sm rounded-md px-2 py-1.5 -mx-2 cursor-pointer transition-colors ${
-                categoriaIds.includes(parent.id) ? 'bg-secondary text-foreground' : 'hover:bg-secondary/60 text-foreground/90'
-              }`}
-            >
-              <input
-                type="checkbox"
-                className="w-4 h-4 rounded border-border accent-foreground flex-shrink-0"
-                checked={categoriaIds.includes(parent.id)}
-                onChange={() => onToggleCategoria(parent.id)}
-              />
-              <span className="truncate">{parent.nombre}</span>
-            </label>
-            {parent.hijos?.length > 0 && (
-              <div className="ml-[0.9rem] pl-3 mt-0.5 mb-1 space-y-0.5 border-l border-border">
-                {parent.hijos.map((child: any) => (
-                  <label
-                    key={child.id}
-                    className={`flex items-center gap-2.5 text-sm rounded-md px-2 py-1.5 -mx-2 cursor-pointer transition-colors ${
-                      categoriaIds.includes(child.id) ? 'bg-secondary text-foreground' : 'hover:bg-secondary/60 text-muted-foreground'
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      className="w-3.5 h-3.5 rounded border-border accent-foreground flex-shrink-0"
-                      checked={categoriaIds.includes(child.id)}
-                      onChange={() => onToggleCategoria(child.id)}
-                    />
-                    <span className="truncate">{child.nombre}</span>
-                  </label>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function FiltersPanel({ cats, categoriaIds, onToggleCategoria, priceRange, onChangePrice }: any) {
-  return (
-    <div className="space-y-6">
-      <PriceSection priceRange={priceRange} onChangePrice={onChangePrice} />
-      <div className="h-px bg-border" />
-      <CategorySection cats={cats} categoriaIds={categoriaIds} onToggleCategoria={onToggleCategoria} />
     </div>
   );
 }
@@ -141,15 +82,44 @@ function CatalogoContent() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [categoriaIds, setCategoriaIds] = useState<number[]>([]);
-  const [priceRange, setPriceRange] = useState<[number, number]>([MIN_PRICE, MAX_PRICE]);
-  const [appliedPrice, setAppliedPrice] = useState<[number, number]>([MIN_PRICE, MAX_PRICE]);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const priceDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const priceTouched = useRef(false);
+
+  // Tope real del slider de precio: el precio más alto entre los productos
+  // activos (con fallback mientras carga o si el catálogo está vacío).
+  const { data: priceRangeData } = useQuery({
+    queryKey: ['price-range'],
+    queryFn: () => api.get('/products/price-range').then((r) => r.data),
+    staleTime: 60_000,
+  });
+  const MAX_PRICE = useMemo(() => {
+    const m = priceRangeData?.max ?? 0;
+    return m > 0 ? Math.ceil(m / PRICE_STEP) * PRICE_STEP : FALLBACK_MAX_PRICE;
+  }, [priceRangeData]);
+
+  const [priceRange, setPriceRange] = useState<[number, number]>([MIN_PRICE, FALLBACK_MAX_PRICE]);
+  const [appliedPrice, setAppliedPrice] = useState<[number, number]>([MIN_PRICE, FALLBACK_MAX_PRICE]);
+
+  // Mientras el usuario no haya tocado el slider, seguimos el tope real
+  // en cuanto llega del backend (en vez de quedarnos con el fallback).
+  useEffect(() => {
+    if (!priceTouched.current) {
+      setPriceRange([MIN_PRICE, MAX_PRICE]);
+      setAppliedPrice([MIN_PRICE, MAX_PRICE]);
+    }
+  }, [MAX_PRICE]);
 
   useEffect(() => {
     const s = searchParams.get('search');
     if (s !== null) {
       setSearch(s);
+      setPage(1);
+    }
+    const c = searchParams.get('categoriaId');
+    if (c !== null) {
+      const ids = c.split(',').map((v) => Number(v.trim())).filter((n) => !Number.isNaN(n));
+      setCategoriaIds(ids);
       setPage(1);
     }
   }, [searchParams]);
@@ -192,15 +162,17 @@ function CatalogoContent() {
     return map;
   }, [cats]);
 
-  const hasActiveFilters = categoriaIds.length > 0 || appliedPrice[0] > MIN_PRICE || appliedPrice[1] < MAX_PRICE || !!search;
-  const activeFilterCount = categoriaIds.length + (appliedPrice[0] > MIN_PRICE || appliedPrice[1] < MAX_PRICE ? 1 : 0) + (search ? 1 : 0);
+  const priceActive = appliedPrice[0] > MIN_PRICE || appliedPrice[1] < MAX_PRICE;
+  const hasActiveFilters = categoriaIds.length > 0 || priceActive || !!search;
+  const activeFilterCount = categoriaIds.length + (priceActive ? 1 : 0) + (search ? 1 : 0);
 
-  const toggleCategoria = (id: number) => {
-    setCategoriaIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  const removeCategoria = (id: number) => {
+    setCategoriaIds((prev) => prev.filter((x) => x !== id));
     setPage(1);
   };
 
   const changePrice = (next: [number, number]) => {
+    priceTouched.current = true;
     setPriceRange(next);
     if (priceDebounce.current) clearTimeout(priceDebounce.current);
     priceDebounce.current = setTimeout(() => {
@@ -210,6 +182,7 @@ function CatalogoContent() {
   };
 
   const resetPrice = () => {
+    priceTouched.current = true;
     setPriceRange([MIN_PRICE, MAX_PRICE]);
     setAppliedPrice([MIN_PRICE, MAX_PRICE]);
     setPage(1);
@@ -218,13 +191,13 @@ function CatalogoContent() {
   const clearFilters = () => {
     setSearch('');
     setCategoriaIds([]);
+    priceTouched.current = false;
     setPriceRange([MIN_PRICE, MAX_PRICE]);
     setAppliedPrice([MIN_PRICE, MAX_PRICE]);
     setPage(1);
   };
 
-  const filterProps = { cats, categoriaIds, onToggleCategoria: toggleCategoria, priceRange, onChangePrice: changePrice };
-  const priceActive = appliedPrice[0] > MIN_PRICE || appliedPrice[1] < MAX_PRICE;
+  const priceSectionProps = { priceRange, onChangePrice: changePrice, maxPrice: MAX_PRICE };
 
   return (
     <div>
@@ -277,7 +250,7 @@ function CatalogoContent() {
                   </button>
                 )}
               </div>
-              <FiltersPanel {...filterProps} />
+              <PriceSection {...priceSectionProps} />
             </div>
           </aside>
 
@@ -292,7 +265,7 @@ function CatalogoContent() {
                   </Button>
                 </div>
                 <div className="flex-1 overflow-y-auto px-4 py-5">
-                  <FiltersPanel {...filterProps} />
+                  <PriceSection {...priceSectionProps} />
                 </div>
                 <div className="p-4 border-t border-border flex-shrink-0 flex gap-2">
                   {hasActiveFilters && (
@@ -313,7 +286,7 @@ function CatalogoContent() {
               <div className="flex flex-wrap items-center gap-2 mb-5">
                 {search && <FilterChip label={`"${search}"`} onRemove={() => { setSearch(''); setPage(1); }} />}
                 {categoriaIds.map((id) => (
-                  <FilterChip key={id} label={catNombre.get(id) ?? `Categoría ${id}`} onRemove={() => toggleCategoria(id)} />
+                  <FilterChip key={id} label={catNombre.get(id) ?? `Categoría ${id}`} onRemove={() => removeCategoria(id)} />
                 ))}
                 {priceActive && (
                   <FilterChip label={`S/${appliedPrice[0]} – S/${appliedPrice[1]}${appliedPrice[1] === MAX_PRICE ? '+' : ''}`} onRemove={resetPrice} />

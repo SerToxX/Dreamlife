@@ -33,6 +33,9 @@ export class ProductsController {
   @Public() @Get('stats/public')
   getPublicStats() { return this.productsService.getPublicStats(); }
 
+  @Public() @Get('price-range')
+  getPriceRange() { return this.productsService.getPriceRange(); }
+
   @Get('items/search')
   @UseGuards(AuthGuard('jwt'), RolesGuard) @Roles('admin', 'worker')
   searchItems(@Query('search') search?: string) { return this.productsService.searchItems(search); }

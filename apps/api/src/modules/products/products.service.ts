@@ -40,23 +40,27 @@ export class ProductsService {
       if (minPrecio !== undefined && minPrecio !== null && `${minPrecio}` !== '') where.precioBase.gte = Number(minPrecio);
       if (maxPrecio !== undefined && maxPrecio !== null && `${maxPrecio}` !== '') where.precioBase.lte = Number(maxPrecio);
     }
-    const [total, productos] = await Promise.all([
+    const [total, productosRaw] = await Promise.all([
       this.prisma.producto.count({ where }),
+      // Nota: Prisma no permite combinar `skip` en el nivel superior con un
+      // `take` dentro de un include anidado (ej. imagenes: { take: 1 }) —
+      // tira PrismaClientValidationError. Por eso traemos todas las
+      // imágenes (normalmente son pocas por producto) y nos quedamos con
+      // la primera en memoria, en vez de pedirle a Prisma que la recorte.
       this.prisma.producto.findMany({
         where, skip, take: limit,
         include: {
           categoria: true,
-          imagenes: { orderBy: { orden: 'asc' }, take: 1 },
+          imagenes: { orderBy: { orden: 'asc' } },
         },
         orderBy: { createdAt: 'desc' },
       }),
     ]);
+    const productos = productosRaw.map((p) => ({ ...p, imagenes: p.imagenes.slice(0, 1) }));
 
-    // Los items se traen aparte (en vez de anidados en el include de arriba):
-    // combinar paginación (skip/take) + un include anidado con 4 relaciones más
-    // (variante, diseno, stocks, ofertaItems->oferta) en una sola consulta
-    // causaba un 500 intermitente en producción. Separarlo en dos consultas
-    // más simples y unirlas en memoria es más robusto.
+    // Los items se traen en una consulta aparte y se unen en memoria: evita
+    // repetir el mismo problema de `skip` + relación anidada si en el futuro
+    // alguno de los includes de items necesita su propio `take`/`orderBy`.
     const items = productos.length
       ? await this.prisma.productoItem.findMany({
           where: { productoId: { in: productos.map((p) => p.id) }, activo: true },
@@ -175,5 +179,15 @@ export class ProductsService {
       this.prisma.cliente.count(),
     ]);
     return { productos: productCount, clientes: clientCount };
+  }
+
+  // Precio máximo entre los productos activos, usado como tope del slider
+  // de precio en el catálogo público (en vez de un valor fijo en el front).
+  async getPriceRange() {
+    const result = await this.prisma.producto.aggregate({
+      where: { activo: true },
+      _max: { precioBase: true },
+    });
+    return { max: Number(result._max.precioBase ?? 0) };
   }
 }
