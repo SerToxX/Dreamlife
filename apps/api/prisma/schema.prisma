@@ -236,8 +236,10 @@ model AjusteStock {
   id        Int      @id @default(autoincrement())
   stockId   Int
   stock     Stock    @relation(fields: [stockId], references: [id])
-  usuarioId Int
-  usuario   Usuario  @relation(fields: [usuarioId], references: [id])
+  // Null cuando el movimiento lo generó una venta online (tipo VENTA): no hay
+  // un Usuario de staff detrás, es el propio cliente desde el checkout.
+  usuarioId Int?
+  usuario   Usuario? @relation(fields: [usuarioId], references: [id])
   tipo      String   @db.VarChar(50)
   cantidad  Int
   motivo    String?  @db.Text

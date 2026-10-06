@@ -1,10 +1,76 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotificationsGateway } from '../notifications/notifications.gateway';
 
 @Injectable()
 export class InventoryService {
   constructor(private prisma: PrismaService, private gateway: NotificationsGateway) {}
+
+  // Descuenta el stock de un item para una venta, repartiéndolo entre
+  // ubicaciones si hace falta, y deja registro en el historial (AjusteStock
+  // tipo VENTA) de dónde salió cada unidad.
+  //
+  // Prioridad al elegir de dónde descontar:
+  //   1. La ubicación de tipo "online" primero (si existe y tiene stock) —
+  //      tiene más sentido vender lo que ya está listo para despacho online
+  //      antes de tocar el stock físico de una tienda.
+  //   2. Entre el resto, la que tenga más stock primero (para no fragmentar
+  //      ubicaciones chicas innecesariamente).
+  //   3. Si ninguna ubicación alcanza sola, se reparte entre varias en ese
+  //      mismo orden hasta completar la cantidad.
+  //
+  // Para una venta de POS (ubicacionId fijo, viene de la caja abierta) se
+  // restringe a esa sola ubicación — no tiene sentido descontarle stock a
+  // otra tienda por una venta presencial.
+  async decrementForSale(
+    tx: Prisma.TransactionClient,
+    params: { itemId: number; cantidad: number; ventaId: number; usuarioId?: number | null; ubicacionId?: number },
+  ): Promise<{ stockId: number; ubicacionId: number; cantidad: number }[]> {
+    const stocks = await tx.stock.findMany({
+      where: { itemId: params.itemId, ...(params.ubicacionId ? { ubicacionId: params.ubicacionId } : {}) },
+      include: { ubicacion: true },
+    });
+
+    const ordenados = [...stocks].sort((a, b) => {
+      const aOnline = a.ubicacion.tipo === 'online' ? 0 : 1;
+      const bOnline = b.ubicacion.tipo === 'online' ? 0 : 1;
+      if (aOnline !== bOnline) return aOnline - bOnline;
+      return b.cantidad - a.cantidad;
+    });
+
+    let restante = params.cantidad;
+    const splits: { stockId: number; ubicacionId: number; cantidad: number }[] = [];
+
+    for (const stock of ordenados) {
+      if (restante <= 0) break;
+      if (stock.cantidad <= 0) continue;
+      const tomar = Math.min(stock.cantidad, restante);
+
+      await tx.stock.update({ where: { id: stock.id }, data: { cantidad: { decrement: tomar } } });
+      await tx.ajusteStock.create({
+        data: {
+          stockId: stock.id,
+          usuarioId: params.usuarioId ?? null,
+          tipo: 'VENTA',
+          cantidad: tomar,
+          motivo: `Venta #${params.ventaId}`,
+        },
+      });
+
+      splits.push({ stockId: stock.id, ubicacionId: stock.ubicacionId, cantidad: tomar });
+      restante -= tomar;
+    }
+
+    // No debería pasar: el stock total ya se valida antes de abrir la
+    // transacción. Pero si dos compras corrieron a la vez y se adelantó
+    // otra, mejor frenar acá que dejar una venta con stock descontado a medias.
+    if (restante > 0) {
+      throw new BadRequestException('Stock insuficiente: cambió mientras se procesaba la compra, intenta de nuevo');
+    }
+
+    return splits;
+  }
 
   async getStock(ubicacionId?: number) {
     const where: any = {};

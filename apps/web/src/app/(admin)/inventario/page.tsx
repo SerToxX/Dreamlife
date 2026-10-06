@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Minus, Edit3, AlertCircle, Search, MapPin, PackagePlus, ArrowRightLeft, ImageOff, History, X, ArrowDownCircle, ArrowUpCircle, Repeat, Warehouse } from 'lucide-react';
+import { Plus, Minus, Edit3, AlertCircle, Search, MapPin, PackagePlus, ArrowRightLeft, ImageOff, History, X, ArrowDownCircle, ArrowUpCircle, Repeat, Warehouse, ShoppingCart } from 'lucide-react';
 import {
   ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend,
 } from 'recharts';
@@ -396,7 +396,9 @@ function HistorialModal({ onClose }: { onClose: () => void }) {
     SALIDA: { icon: ArrowUpCircle, color: 'text-accent', label: 'Salida' },
     AJUSTE: { icon: Edit3, color: 'text-foreground', label: 'Ajuste' },
     TRANSFERENCIA: { icon: Repeat, color: 'text-blue-600 dark:text-blue-400', label: 'Transferencia' },
+    VENTA: { icon: ShoppingCart, color: 'text-accent', label: 'Venta' },
   };
+  const esSalida = (tipo: string) => tipo === 'SALIDA' || tipo === 'VENTA';
 
   return (
     <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
@@ -428,7 +430,7 @@ function HistorialModal({ onClose }: { onClose: () => void }) {
                       </p>
                     </div>
                     <div className="text-right flex-shrink-0">
-                      <p className={cn('font-bold', meta.color)}>{m.tipo === 'SALIDA' ? '-' : m.tipo === 'ENTRADA' ? '+' : ''}{m.cantidad}</p>
+                      <p className={cn('font-bold', meta.color)}>{esSalida(m.tipo) ? '-' : m.tipo === 'ENTRADA' ? '+' : ''}{m.cantidad}</p>
                       <p className="text-[10px] text-muted-foreground">{new Date(m.createdAt).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
                     </div>
                   </div>

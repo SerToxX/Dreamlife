@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotificationsGateway } from '../notifications/notifications.gateway';
+import { InventoryService } from '../inventory/inventory.service';
 
 interface QuickCheckoutDto {
   items: { itemId: number; cantidad: number; precioUnitario?: number }[];
@@ -25,7 +26,7 @@ const TIPOS_DOCUMENTO = ['DNI', 'CE', 'PASAPORTE', 'RUC'];
 
 @Injectable()
 export class CheckoutService {
-  constructor(private prisma: PrismaService, private gateway: NotificationsGateway) {}
+  constructor(private prisma: PrismaService, private gateway: NotificationsGateway, private inventory: InventoryService) {}
 
   // Quick checkout: acepta items directamente (sin necesidad de carrito en BD)
   // clienteId siempre viene del JWT validado en el controller, nunca del body.
@@ -109,12 +110,20 @@ export class CheckoutService {
       });
 
       for (const det of detallesData) {
-        await tx.ventaDetalle.create({ data: { ventaId: nuevaVenta.id, ...det } });
-        // Decrementar stock
-        const item = items.find(i => i.id === det.itemId)!;
-        const stock = item.stocks.find(s => s.cantidad >= det.cantidad);
-        if (stock) {
-          await tx.stock.update({ where: { id: stock.id }, data: { cantidad: { decrement: det.cantidad } } });
+        // Descuenta el stock (prioriza la ubicación online, reparte entre
+        // varias si ninguna alcanza sola) y deja una línea de venta por cada
+        // ubicación de la que salió, para poder rastrear después de dónde
+        // salió cada unidad vendida.
+        const splits = await this.inventory.decrementForSale(tx, {
+          itemId: det.itemId, cantidad: det.cantidad, ventaId: nuevaVenta.id, usuarioId: null,
+        });
+        for (const split of splits) {
+          await tx.ventaDetalle.create({
+            data: {
+              ventaId: nuevaVenta.id, itemId: det.itemId, stockId: split.stockId,
+              cantidad: split.cantidad, precioBase: det.precioBase, precioVendido: det.precioVendido,
+            },
+          });
         }
       }
 

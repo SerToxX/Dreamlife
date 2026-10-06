@@ -1,10 +1,11 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotificationsGateway } from '../notifications/notifications.gateway';
+import { InventoryService } from '../inventory/inventory.service';
 
 @Injectable()
 export class PosService {
-  constructor(private prisma: PrismaService, private gateway: NotificationsGateway) {}
+  constructor(private prisma: PrismaService, private gateway: NotificationsGateway, private inventory: InventoryService) {}
 
   async openCaja(usuarioId: number, ubicacionId: number, montoInicial: number) {
     if (!ubicacionId) throw new BadRequestException('Selecciona un local para abrir caja');
@@ -50,9 +51,20 @@ export class PosService {
         data: { usuarioId: dto.usuarioId, clienteId: dto.clienteId, cajaId: dto.cajaId, ubicacionId: caja.ubicacionId, canal: 'TIENDA', estado: 'ENTREGADO', total, descuento: dto.descuento || 0 },
       });
       for (const item of dto.items) {
-        await tx.ventaDetalle.create({ data: { ventaId: venta.id, itemId: item.itemId, cantidad: item.cantidad, precioBase: item.precio, precioVendido: item.precio } });
-        const stock = await tx.stock.findFirst({ where: { itemId: item.itemId, ubicacionId: caja.ubicacionId } });
-        if (stock) await tx.stock.update({ where: { id: stock.id }, data: { cantidad: { decrement: item.cantidad } } });
+        // Venta presencial: el stock sale únicamente de la ubicación de la
+        // caja abierta (no tiene sentido descontarle a otra tienda).
+        const splits = await this.inventory.decrementForSale(tx, {
+          itemId: item.itemId, cantidad: item.cantidad, ventaId: venta.id,
+          usuarioId: dto.usuarioId, ubicacionId: caja.ubicacionId,
+        });
+        for (const split of splits) {
+          await tx.ventaDetalle.create({
+            data: {
+              ventaId: venta.id, itemId: item.itemId, stockId: split.stockId,
+              cantidad: split.cantidad, precioBase: item.precio, precioVendido: item.precio,
+            },
+          });
+        }
       }
       for (const pago of dto.pagos) {
         await tx.pago.create({ data: { ventaId: venta.id, metodo: pago.metodo, monto: pago.monto } });
