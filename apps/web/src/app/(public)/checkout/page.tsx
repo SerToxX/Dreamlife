@@ -1,9 +1,10 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, CreditCard, Smartphone, Truck, Banknote, LogOut, User, MapPin } from 'lucide-react';
+import { ArrowLeft, CreditCard, Smartphone, Truck, Banknote, LogOut, User, MapPin, X } from 'lucide-react';
 import { initMercadoPago, Payment } from '@mercadopago/sdk-react';
 import api from '@/lib/api';
 import { useCartStore } from '@/stores/cart.store';
@@ -72,6 +73,14 @@ export default function CheckoutPage() {
   const camposCompletos = form.nombre.trim() && form.correo.trim() && form.telefono.trim()
     && form.numeroDocumento.trim() && form.direccion.trim() && form.distrito.trim()
     && form.provincia.trim() && form.departamento.trim();
+
+  const pagoConTarjetaAbierto = metodo === 'TARJETA' && !!camposCompletos;
+  useEffect(() => {
+    if (pagoConTarjetaAbierto) {
+      document.body.style.overflow = 'hidden';
+      return () => { document.body.style.overflow = ''; };
+    }
+  }, [pagoConTarjetaAbierto]);
 
   const { mutate, isPending } = useMutation({
     mutationFn: (mercadoPagoFormData?: unknown) => api.post('/checkout', {
@@ -199,29 +208,7 @@ export default function CheckoutPage() {
             <div className="flex justify-between font-bold text-lg pt-2 border-t border-border"><span>Total</span><span>{formatPrice(total + envio)}</span></div>
           </div>
           {metodo === 'TARJETA' ? (
-            camposCompletos ? (
-              <div className="mt-4" data-mp-bricks-page="payment">
-                {isPending && <p className="text-xs text-muted-foreground text-center mb-2">Procesando tu pago...</p>}
-                <Payment
-                  key={total + envio}
-                  initialization={{
-                    amount: Number((total + envio).toFixed(2)),
-                    payer: {
-                      email: form.correo,
-                      identification: { type: form.tipoDocumento, number: form.numeroDocumento },
-                    },
-                  }}
-                  customization={{ paymentMethods: { creditCard: 'all', debitCard: 'all' } }}
-                  onSubmit={({ formData }) => new Promise<void>((resolve, reject) => {
-                    mutate(formData, {
-                      onSuccess: () => resolve(),
-                      onError: () => reject(),
-                    });
-                  })}
-                  onError={(error) => console.error('[MercadoPago Brick]', error)}
-                />
-              </div>
-            ) : (
+            !camposCompletos && (
               <p className="text-[11px] text-muted-foreground text-center mt-4">Completa los campos marcados con * para ver el formulario de pago</p>
             )
           ) : (
@@ -232,6 +219,41 @@ export default function CheckoutPage() {
           )}
         </CardContent></Card>
       </div>
+
+      {pagoConTarjetaAbierto && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 animate-in" onClick={() => setMetodo('YAPE')} />
+          <div className="relative bg-background rounded-lg shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto p-5" data-mp-bricks-page="payment">
+            <div className="flex items-center justify-between mb-4">
+              <p className="font-bold">Pagar con tarjeta</p>
+              <button onClick={() => setMetodo('YAPE')} aria-label="Cerrar" className="text-muted-foreground hover:text-foreground">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="checkout-total text-sm text-muted-foreground mb-4">Total: <strong className="text-foreground text-base">{formatPrice(total + envio)}</strong></p>
+            {isPending && <p className="text-xs text-muted-foreground text-center mb-2">Procesando tu pago...</p>}
+            <Payment
+              key={total + envio}
+              initialization={{
+                amount: Number((total + envio).toFixed(2)),
+                payer: {
+                  email: form.correo,
+                  identification: { type: form.tipoDocumento, number: form.numeroDocumento },
+                },
+              }}
+              customization={{ paymentMethods: { creditCard: 'all', debitCard: 'all' } }}
+              onSubmit={({ formData }) => new Promise<void>((resolve, reject) => {
+                mutate(formData, {
+                  onSuccess: () => resolve(),
+                  onError: () => reject(),
+                });
+              })}
+              onError={(error) => console.error('[MercadoPago Brick]', error)}
+            />
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
