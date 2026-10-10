@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, CreditCard, Smartphone, Truck, Banknote, LogOut, User, MapPin } from 'lucide-react';
+import { initMercadoPago, Payment } from '@mercadopago/sdk-react';
 import api from '@/lib/api';
 import { useCartStore } from '@/stores/cart.store';
 import { useAuthStore } from '@/stores/auth.store';
@@ -42,6 +43,10 @@ export default function CheckoutPage() {
     }
   }, [hydrated, isAuthenticated, router]);
 
+  useEffect(() => {
+    if (process.env.NEXT_PUBLIC_MP_PUBLIC_KEY) initMercadoPago(process.env.NEXT_PUBLIC_MP_PUBLIC_KEY);
+  }, []);
+
   // Autocompleta con los datos de la cuenta, pero deja todo editable — el
   // comprador puede cambiar cualquier campo antes de pagar (ej. enviar a
   // otra dirección, o usar el documento de otra persona).
@@ -69,7 +74,7 @@ export default function CheckoutPage() {
     && form.provincia.trim() && form.departamento.trim();
 
   const { mutate, isPending } = useMutation({
-    mutationFn: () => api.post('/checkout', {
+    mutationFn: (mercadoPagoFormData?: unknown) => api.post('/checkout', {
       items: items.map((i) => ({ itemId: i.id, cantidad: i.qty, precio: i.precio })),
       metodoPago: metodo,
       nombreComprador: form.nombre,
@@ -83,6 +88,7 @@ export default function CheckoutPage() {
       departamento: form.departamento,
       referencia: form.referencia,
       notaCliente: form.notas,
+      mercadoPagoFormData,
     }),
     onSuccess: () => {
       clear();
@@ -192,8 +198,38 @@ export default function CheckoutPage() {
             <div className="flex justify-between"><span className="text-muted-foreground">Envío</span><span>{envio === 0 ? 'Gratis' : formatPrice(envio)}</span></div>
             <div className="flex justify-between font-bold text-lg pt-2 border-t border-border"><span>Total</span><span>{formatPrice(total + envio)}</span></div>
           </div>
-          <Button variant="gradient" className="w-full mt-4 h-12 text-base" disabled={!camposCompletos || isPending} onClick={() => mutate()}>{isPending ? 'Procesando...' : 'Confirmar pedido'}</Button>
-          {!camposCompletos && <p className="text-[11px] text-muted-foreground text-center mt-2">Completa los campos marcados con * para continuar</p>}
+          {metodo === 'TARJETA' ? (
+            camposCompletos ? (
+              <div className="mt-4" data-mp-bricks-page="payment">
+                {isPending && <p className="text-xs text-muted-foreground text-center mb-2">Procesando tu pago...</p>}
+                <Payment
+                  key={total + envio}
+                  initialization={{
+                    amount: Number((total + envio).toFixed(2)),
+                    payer: {
+                      email: form.correo,
+                      identification: { type: form.tipoDocumento, number: form.numeroDocumento },
+                    },
+                  }}
+                  customization={{ paymentMethods: { creditCard: 'all', debitCard: 'all' } }}
+                  onSubmit={({ formData }) => new Promise<void>((resolve, reject) => {
+                    mutate(formData, {
+                      onSuccess: () => resolve(),
+                      onError: () => reject(),
+                    });
+                  })}
+                  onError={(error) => console.error('[MercadoPago Brick]', error)}
+                />
+              </div>
+            ) : (
+              <p className="text-[11px] text-muted-foreground text-center mt-4">Completa los campos marcados con * para ver el formulario de pago</p>
+            )
+          ) : (
+            <>
+              <Button variant="gradient" className="w-full mt-4 h-12 text-base" disabled={!camposCompletos || isPending} onClick={() => mutate(undefined)}>{isPending ? 'Procesando...' : 'Confirmar pedido'}</Button>
+              {!camposCompletos && <p className="text-[11px] text-muted-foreground text-center mt-2">Completa los campos marcados con * para continuar</p>}
+            </>
+          )}
         </CardContent></Card>
       </div>
     </div>

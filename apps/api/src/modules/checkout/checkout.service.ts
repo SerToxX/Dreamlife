@@ -1,7 +1,9 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotificationsGateway } from '../notifications/notifications.gateway';
 import { InventoryService } from '../inventory/inventory.service';
+import { MercadoPagoService } from '../payments/mercadopago.service';
 
 interface QuickCheckoutDto {
   items: { itemId: number; cantidad: number; precioUnitario?: number }[];
@@ -20,13 +22,26 @@ interface QuickCheckoutDto {
   departamento?: string;
   referencia?: string;
   notaCliente?: string;
+  // Salida del Payment Brick de Mercado Pago — solo cuando metodoPago === 'TARJETA'
+  mercadoPagoFormData?: {
+    token: string;
+    issuer_id?: string;
+    installments: number;
+    payment_method_id: string;
+    payer: { email: string; identification?: { type: string; number: string } };
+  };
 }
 
 const TIPOS_DOCUMENTO = ['DNI', 'CE', 'PASAPORTE', 'RUC'];
 
 @Injectable()
 export class CheckoutService {
-  constructor(private prisma: PrismaService, private gateway: NotificationsGateway, private inventory: InventoryService) {}
+  constructor(
+    private prisma: PrismaService,
+    private gateway: NotificationsGateway,
+    private inventory: InventoryService,
+    private mercadoPago: MercadoPagoService,
+  ) {}
 
   // Quick checkout: acepta items directamente (sin necesidad de carrito en BD)
   // clienteId siempre viene del JWT validado en el controller, nunca del body.
@@ -91,6 +106,28 @@ export class CheckoutService {
     }
     total = Math.max(0, total - descuentoTotal);
 
+    // Monto de cobro: siempre derivado de datos de confianza del servidor
+    // (carrito cargado de la BD + precios recalculados), nunca del monto
+    // que reporte el navegador o el Brick.
+    const trustedOrder = { total };
+    if (!Number.isFinite(trustedOrder.total) || trustedOrder.total <= 0) {
+      throw new BadRequestException('Monto de pedido inválido');
+    }
+
+    // Pago con tarjeta vía Mercado Pago (Payment Brick): se cobra ANTES de
+    // crear la venta y descontar stock — si el pago no se aprueba, no se
+    // crea ningún pedido. El id del pago queda trazado en Pago.referencia.
+    let mpPaymentId: string | undefined;
+    if (dto.metodoPago === 'TARJETA') {
+      if (!dto.mercadoPagoFormData) throw new BadRequestException('Faltan los datos de pago de la tarjeta');
+      const externalReference = randomUUID();
+      const pago = await this.mercadoPago.crearPago(dto.mercadoPagoFormData, trustedOrder.total, externalReference);
+      if (pago.status !== 'approved') {
+        throw new BadRequestException(`Pago no aprobado (${pago.status_detail ?? pago.status}). Intenta con otra tarjeta.`);
+      }
+      mpPaymentId = String(pago.id);
+    }
+
     // Transacción
     const venta = await this.prisma.$transaction(async (tx) => {
       const nuevaVenta = await tx.venta.create({
@@ -98,7 +135,7 @@ export class CheckoutService {
           clienteId,
           canal: 'ONLINE',
           estado: 'CONFIRMADA',
-          total,
+          total: trustedOrder.total,
           descuento: descuentoTotal,
           notas: dto.notaCliente,
           nombreComprador: dto.nombreComprador.trim(),
@@ -129,7 +166,7 @@ export class CheckoutService {
 
       // Pago único
       await tx.pago.create({
-        data: { ventaId: nuevaVenta.id, metodo: dto.metodoPago ?? 'EFECTIVO', monto: total },
+        data: { ventaId: nuevaVenta.id, metodo: dto.metodoPago ?? 'EFECTIVO', monto: trustedOrder.total, referencia: mpPaymentId },
       });
 
       await tx.envio.create({
@@ -144,7 +181,7 @@ export class CheckoutService {
       });
 
       // Siempre hay cliente (checkout anónimo ya no está permitido)
-      await tx.cliente.update({ where: { id: clienteId }, data: { puntos: { increment: Math.floor(total) } } });
+      await tx.cliente.update({ where: { id: clienteId }, data: { puntos: { increment: Math.floor(trustedOrder.total) } } });
 
       return nuevaVenta;
     });
