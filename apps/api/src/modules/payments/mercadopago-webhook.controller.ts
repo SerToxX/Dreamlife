@@ -29,7 +29,10 @@ export class MercadoPagoWebhookController {
     const dataId = body?.data?.id;
     const topic = body?.type;
 
-    if (!ts || !v1 || !dataId || !requestId) return res.status(HttpStatus.BAD_REQUEST).end();
+    if (!ts || !v1 || !dataId || !requestId) {
+      this.logger.warn(`Webhook sin campos requeridos (ts=${!!ts} v1=${!!v1} dataId=${!!dataId} requestId=${!!requestId})`);
+      return res.status(HttpStatus.BAD_REQUEST).end();
+    }
 
     const secret = process.env.MP_WEBHOOK_SECRET;
     if (!secret) {
@@ -40,7 +43,10 @@ export class MercadoPagoWebhookController {
     const canonical = `id:${dataId};request-id:${requestId};ts:${ts};`;
     const expected = createHmac('sha256', secret).update(canonical).digest('hex');
     const ok = expected.length === v1.length && timingSafeEqual(Buffer.from(expected), Buffer.from(v1));
-    if (!ok) return res.status(HttpStatus.UNAUTHORIZED).end();
+    if (!ok) {
+      this.logger.warn(`Firma inválida en webhook de pago ${dataId} — revisar que MP_WEBHOOK_SECRET sea exactamente el del dashboard`);
+      return res.status(HttpStatus.UNAUTHORIZED).end();
+    }
 
     res.status(HttpStatus.OK).end();
     if (topic === 'payment') queueMicrotask(() => this.reconciliar(String(dataId)));
