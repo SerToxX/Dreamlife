@@ -1,11 +1,9 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, CreditCard, Smartphone, Truck, Banknote, LogOut, User, MapPin, X } from 'lucide-react';
-import { initMercadoPago, Payment } from '@mercadopago/sdk-react';
+import { ArrowLeft, CreditCard, Smartphone, Truck, Banknote, LogOut, User, MapPin } from 'lucide-react';
 import api from '@/lib/api';
 import { useCartStore } from '@/stores/cart.store';
 import { useAuthStore } from '@/stores/auth.store';
@@ -36,6 +34,7 @@ export default function CheckoutPage() {
     direccion: '', distrito: '', provincia: '', departamento: '', referencia: '',
     notas: '',
   });
+  const [redirigiendo, setRedirigiendo] = useState(false);
 
   useEffect(() => {
     if (hydrated && !isAuthenticated) {
@@ -43,10 +42,6 @@ export default function CheckoutPage() {
       router.replace('/login');
     }
   }, [hydrated, isAuthenticated, router]);
-
-  useEffect(() => {
-    if (process.env.NEXT_PUBLIC_MP_PUBLIC_KEY) initMercadoPago(process.env.NEXT_PUBLIC_MP_PUBLIC_KEY);
-  }, []);
 
   // Autocompleta con los datos de la cuenta, pero deja todo editable — el
   // comprador puede cambiar cualquier campo antes de pagar (ej. enviar a
@@ -74,31 +69,23 @@ export default function CheckoutPage() {
     && form.numeroDocumento.trim() && form.direccion.trim() && form.distrito.trim()
     && form.provincia.trim() && form.departamento.trim();
 
-  const pagoConTarjetaAbierto = metodo === 'TARJETA' && !!camposCompletos;
-  useEffect(() => {
-    if (pagoConTarjetaAbierto) {
-      document.body.style.overflow = 'hidden';
-      return () => { document.body.style.overflow = ''; };
-    }
-  }, [pagoConTarjetaAbierto]);
+  const datosPedido = () => ({
+    items: items.map((i) => ({ itemId: i.id, cantidad: i.qty, precio: i.precio })),
+    nombreComprador: form.nombre,
+    correoComprador: form.correo,
+    telefonoComprador: form.telefono,
+    tipoDocumento: form.tipoDocumento,
+    numeroDocumento: form.numeroDocumento,
+    direccionEnvio: form.direccion,
+    distrito: form.distrito,
+    provincia: form.provincia,
+    departamento: form.departamento,
+    referencia: form.referencia,
+    notaCliente: form.notas,
+  });
 
   const { mutate, isPending } = useMutation({
-    mutationFn: (mercadoPagoFormData?: unknown) => api.post('/checkout', {
-      items: items.map((i) => ({ itemId: i.id, cantidad: i.qty, precio: i.precio })),
-      metodoPago: metodo,
-      nombreComprador: form.nombre,
-      correoComprador: form.correo,
-      telefonoComprador: form.telefono,
-      tipoDocumento: form.tipoDocumento,
-      numeroDocumento: form.numeroDocumento,
-      direccionEnvio: form.direccion,
-      distrito: form.distrito,
-      provincia: form.provincia,
-      departamento: form.departamento,
-      referencia: form.referencia,
-      notaCliente: form.notas,
-      mercadoPagoFormData,
-    }),
+    mutationFn: () => api.post('/checkout', { ...datosPedido(), metodoPago: metodo }),
     onSuccess: () => {
       clear();
       qc.invalidateQueries({ queryKey: ['my-orders'] });
@@ -107,6 +94,22 @@ export default function CheckoutPage() {
     },
     onError: (e: any) => toast({ title: 'Error', description: e.response?.data?.message?.toString() ?? 'Intenta de nuevo', variant: 'destructive' }),
   });
+
+  // Checkout Pro: crea la preferencia de pago (Mercado Pago Preference) para
+  // este pedido y redirige al comprador a init_point para pagar en el sitio
+  // seguro de Mercado Pago. El carrito se vacía recién cuando vuelve con el
+  // pago aprobado (ver /checkout/resultado).
+  const pagarConTarjeta = async () => {
+    // Crea la preference en Mercado Pago y redirige a su init_point
+    setRedirigiendo(true);
+    try {
+      const { data } = await api.post('/checkout/preferencia', datosPedido());
+      window.location.assign(data.init_point);
+    } catch (e: any) {
+      setRedirigiendo(false);
+      toast({ title: 'Error', description: e.response?.data?.message?.toString() ?? 'Intenta de nuevo', variant: 'destructive' });
+    }
+  };
 
   if (!hydrated || !isAuthenticated) return null;
 
@@ -208,52 +211,22 @@ export default function CheckoutPage() {
             <div className="flex justify-between font-bold text-lg pt-2 border-t border-border"><span>Total</span><span>{formatPrice(total + envio)}</span></div>
           </div>
           {metodo === 'TARJETA' ? (
-            !camposCompletos && (
-              <p className="text-[11px] text-muted-foreground text-center mt-4">Completa los campos marcados con * para ver el formulario de pago</p>
-            )
+            <Button
+              variant="gradient"
+              className="w-full mt-4 h-12 text-base"
+              disabled={!camposCompletos || redirigiendo}
+              data-mp-checkout-cta="checkout-pro"
+              aria-label="Pagar con Mercado Pago"
+              onClick={pagarConTarjeta}
+            >
+              {redirigiendo ? 'Redirigiendo a Mercado Pago...' : 'Pagar con Mercado Pago'}
+            </Button>
           ) : (
-            <>
-              <Button variant="gradient" className="w-full mt-4 h-12 text-base" disabled={!camposCompletos || isPending} onClick={() => mutate(undefined)}>{isPending ? 'Procesando...' : 'Confirmar pedido'}</Button>
-              {!camposCompletos && <p className="text-[11px] text-muted-foreground text-center mt-2">Completa los campos marcados con * para continuar</p>}
-            </>
+            <Button variant="gradient" className="w-full mt-4 h-12 text-base" disabled={!camposCompletos || isPending} onClick={() => mutate()}>{isPending ? 'Procesando...' : 'Confirmar pedido'}</Button>
           )}
+          {!camposCompletos && <p className="text-[11px] text-muted-foreground text-center mt-2">Completa los campos marcados con * para continuar</p>}
         </CardContent></Card>
       </div>
-
-      {pagoConTarjetaAbierto && typeof document !== 'undefined' && createPortal(
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 animate-in" onClick={() => setMetodo('YAPE')} />
-          <div className="relative bg-background rounded-lg shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto p-5" data-mp-bricks-page="payment">
-            <div className="flex items-center justify-between mb-4">
-              <p className="font-bold">Pagar con tarjeta</p>
-              <button onClick={() => setMetodo('YAPE')} aria-label="Cerrar" className="text-muted-foreground hover:text-foreground">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <p className="checkout-total text-sm text-muted-foreground mb-4">Total: <strong className="text-foreground text-base">{formatPrice(total + envio)}</strong></p>
-            {isPending && <p className="text-xs text-muted-foreground text-center mb-2">Procesando tu pago...</p>}
-            <Payment
-              key={total + envio}
-              initialization={{
-                amount: Number((total + envio).toFixed(2)),
-                payer: {
-                  email: form.correo,
-                  identification: { type: form.tipoDocumento, number: form.numeroDocumento },
-                },
-              }}
-              customization={{ paymentMethods: { creditCard: 'all', debitCard: 'all' } }}
-              onSubmit={({ formData }) => new Promise<void>((resolve, reject) => {
-                mutate(formData, {
-                  onSuccess: () => resolve(),
-                  onError: () => reject(),
-                });
-              })}
-              onError={(error) => console.error('[MercadoPago Brick]', error)}
-            />
-          </div>
-        </div>,
-        document.body
-      )}
     </div>
   );
 }

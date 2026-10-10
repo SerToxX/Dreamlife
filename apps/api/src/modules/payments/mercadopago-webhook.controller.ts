@@ -1,23 +1,19 @@
 import { Controller, Post, Req, Res, HttpStatus, Logger } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { createHmac, timingSafeEqual } from 'crypto';
-import { MercadoPagoService } from './mercadopago.service';
-import { PrismaService } from '../../prisma/prisma.service';
-import { NotificationsGateway } from '../notifications/notifications.gateway';
+import { CheckoutService } from '../checkout/checkout.service';
 
 @Controller('payments/mercadopago')
 export class MercadoPagoWebhookController {
   private readonly logger = new Logger(MercadoPagoWebhookController.name);
 
-  constructor(
-    private mercadoPago: MercadoPagoService,
-    private prisma: PrismaService,
-    private gateway: NotificationsGateway,
-  ) {}
+  constructor(private checkout: CheckoutService) {}
 
   // Mercado Pago firma cada notificación con MP_WEBHOOK_SECRET. Responde 200
-  // de inmediato (si no, MP reintenta con backoff hasta ~24h) y reconcilia
-  // después, de forma asíncrona.
+  // de inmediato (si no, MP reintenta con backoff hasta ~24h) y confirma el
+  // pedido después, de forma asíncrona — es la vía confiable de confirmación,
+  // ya que la vuelta del navegador puede no llegar si el comprador cierra la
+  // pestaña antes de volver a dreamlifeperu.com.
   @Post('webhook')
   recibir(@Req() req: Request, @Res() res: Response) {
     const signature = req.header('x-signature') ?? '';
@@ -49,30 +45,12 @@ export class MercadoPagoWebhookController {
     }
 
     res.status(HttpStatus.OK).end();
-    if (topic === 'payment') queueMicrotask(() => this.reconciliar(String(dataId)));
-  }
-
-  // El checkout ya crea la venta en la misma petición que aprueba el pago
-  // (ver CheckoutService). Este webhook es la red de seguridad para el caso
-  // raro en que el pago se aprobó en Mercado Pago pero el servidor se cayó
-  // antes de registrar la venta — avisa a los admins para que lo revisen,
-  // en vez de intentar reconstruir el pedido sin los datos del carrito.
-  private async reconciliar(paymentId: string) {
-    const yaRegistrado = await this.prisma.pago.findFirst({ where: { referencia: paymentId } });
-    if (yaRegistrado) return;
-
-    try {
-      const pago = await this.mercadoPago.obtenerPago(paymentId);
-      if (pago.status !== 'approved') return;
-
-      this.logger.error(`Pago ${paymentId} aprobado en Mercado Pago pero sin venta registrada — revisar manualmente`);
-      this.gateway.emitSync('payments', {
-        alerta: 'pago_sin_venta',
-        paymentId,
-        monto: pago.transaction_amount,
-      });
-    } catch (e) {
-      this.logger.error(`Error reconciliando pago ${paymentId}: ${e}`);
+    if (topic === 'payment') {
+      queueMicrotask(() =>
+        this.checkout.confirmarPorPago(String(dataId)).catch((e) =>
+          this.logger.error(`Error confirmando pago ${dataId}: ${e}`),
+        ),
+      );
     }
   }
 }

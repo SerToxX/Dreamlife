@@ -4,6 +4,11 @@ import { CheckoutService } from './checkout.service';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { InventoryModule } from '../inventory/inventory.module';
 import { PaymentsModule } from '../payments/payments.module';
+import { MercadoPagoWebhookController } from '../payments/mercadopago-webhook.controller';
 
-@Module({ imports: [NotificationsModule, InventoryModule, PaymentsModule], controllers: [CheckoutController], providers: [CheckoutService] })
+@Module({
+  imports: [NotificationsModule, InventoryModule, PaymentsModule],
+  controllers: [CheckoutController, MercadoPagoWebhookController],
+  providers: [CheckoutService],
+})
 export class CheckoutModule {}
