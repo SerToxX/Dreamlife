@@ -79,7 +79,7 @@ export default function BackupsPage() {
             : !data?.length ? <tr><td colSpan={4} className="p-12 text-center text-muted-foreground">Todavía no generas ninguna copia de seguridad</td></tr>
             : data.map((b: any) => (
               <tr key={b.id} className="border-b border-border/50 hover:bg-secondary/30">
-                <td className="p-3 whitespace-nowrap">{new Date(b.createdAt).toLocaleString('es-PE', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
+                <td className="p-3 whitespace-nowrap">{new Date(b.createdAt).toLocaleString('es-PE', { timeZone: 'America/Lima', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
                 <td className="p-3 text-muted-foreground">{formatBytes(b.tamanoBytes)}</td>
                 <td className="p-3 text-muted-foreground">{b.usuario?.nombre ?? '—'}</td>
                 <td className="p-3">

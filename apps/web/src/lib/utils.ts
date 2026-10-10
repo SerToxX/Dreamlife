@@ -38,6 +38,7 @@ export function getPrecioConDescuento(precioBase: number | string, ofertaItems?:
 
 export function formatDate(date: string | Date) {
   return new Intl.DateTimeFormat('es-PE', {
+    timeZone: 'America/Lima',
     year: 'numeric',
     month: 'short',
     day: 'numeric',

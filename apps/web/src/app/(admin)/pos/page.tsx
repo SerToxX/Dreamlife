@@ -83,7 +83,7 @@ function HistorialCajasModal({ onClose }: { onClose: () => void }) {
                     )}>{c.estado === 'ABIERTA' ? 'Abierta' : 'Cerrada'}</span>
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                    <div><p className="text-muted-foreground">Apertura</p><p className="font-medium">{new Date(c.fechaApertura).toLocaleString('es-PE', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</p></div>
+                    <div><p className="text-muted-foreground">Apertura</p><p className="font-medium">{new Date(c.fechaApertura).toLocaleString('es-PE', { timeZone: 'America/Lima', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</p></div>
                     <div><p className="text-muted-foreground">Monto inicial</p><p className="font-medium">{formatPrice(c.montoInicial)}</p></div>
                     <div><p className="text-muted-foreground">Vendido ({c.cantidadVentas})</p><p className="font-medium">{formatPrice(c.totalVendido)}</p></div>
                     <div>
@@ -235,7 +235,7 @@ function VentaView({ caja }: { caja: any }) {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 p-3 rounded-lg border border-border bg-secondary/30">
         <div className="flex items-center gap-4 flex-wrap">
           <div className="flex items-center gap-2 text-sm"><Store className="w-4 h-4 text-muted-foreground" /><span className="font-medium">{caja.ubicacion?.nombre}</span></div>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground"><Clock className="w-4 h-4" />Desde {new Date(caja.fechaApertura).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}</div>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground"><Clock className="w-4 h-4" />Desde {new Date(caja.fechaApertura).toLocaleTimeString('es-PE', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit' })}</div>
           <div className="text-sm text-muted-foreground">Apertura: <span className="font-medium text-foreground">{formatPrice(caja.montoInicial)}</span></div>
         </div>
         <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setShowCloseModal(true)}><LogOut className="w-3.5 h-3.5" />Cerrar caja</Button>

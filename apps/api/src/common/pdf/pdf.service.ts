@@ -81,7 +81,7 @@ export class PdfService {
     const width = this.contentWidth(doc);
     const half = width / 2;
     const y = doc.y;
-    const fechaTexto = fecha.toLocaleString('es-PE', { dateStyle: 'medium', timeStyle: 'short' });
+    const fechaTexto = fecha.toLocaleString('es-PE', { timeZone: 'America/Lima', dateStyle: 'medium', timeStyle: 'short' });
 
     doc.font('Helvetica-Bold').fontSize(10).fillColor('#000000').text(`${codigoLabel}: `, MARGIN, y, { continued: true, width: half });
     doc.font('Helvetica').fillColor('#333333').text(codigo);

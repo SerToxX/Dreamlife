@@ -431,7 +431,7 @@ function HistorialModal({ onClose }: { onClose: () => void }) {
                     </div>
                     <div className="text-right flex-shrink-0">
                       <p className={cn('font-bold', meta.color)}>{esSalida(m.tipo) ? '-' : m.tipo === 'ENTRADA' ? '+' : ''}{m.cantidad}</p>
-                      <p className="text-[10px] text-muted-foreground">{new Date(m.createdAt).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
+                      <p className="text-[10px] text-muted-foreground">{new Date(m.createdAt).toLocaleDateString('es-PE', { timeZone: 'America/Lima', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
                     </div>
                   </div>
                 );
