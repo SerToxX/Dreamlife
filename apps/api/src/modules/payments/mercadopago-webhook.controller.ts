@@ -2,6 +2,7 @@ import { Controller, Post, Req, Res, HttpStatus, Logger } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { CheckoutService } from '../checkout/checkout.service';
+import { Public } from '../../common/decorators/public.decorator';
 
 @Controller('payments/mercadopago')
 export class MercadoPagoWebhookController {
@@ -14,6 +15,11 @@ export class MercadoPagoWebhookController {
   // pedido después, de forma asíncrona — es la vía confiable de confirmación,
   // ya que la vuelta del navegador puede no llegar si el comprador cierra la
   // pestaña antes de volver a dreamlifeperu.com.
+  //
+  // @Public() es obligatorio: Mercado Pago no manda un JWT nuestro, así que
+  // el guard global lo rechazaría con 401 antes de validar la firma. La
+  // autenticación real de esta ruta ES la firma HMAC, no el JWT.
+  @Public()
   @Post('webhook')
   recibir(@Req() req: Request, @Res() res: Response) {
     const signature = req.header('x-signature') ?? '';
