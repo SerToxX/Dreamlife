@@ -74,9 +74,13 @@ export class AuthService {
   // ── Refresh token ──────────────────────────────────────
   async refreshToken(token: string) {
     try {
-      const payload = this.jwt.verify(token, {
+      const decoded = this.jwt.verify(token, {
         secret: process.env.JWT_REFRESH_SECRET,
       });
+      // jwt.verify() devuelve el payload con "exp"/"iat" ya incluidos —
+      // hay que quitarlos antes de volver a firmar, porque jsonwebtoken
+      // rechaza firmar un payload que ya trae "exp" junto con expiresIn.
+      const { exp, iat, nbf, ...payload } = decoded as Record<string, any>;
 
       if (payload.type === 'usuario') {
         const rt = await this.prisma.refreshToken.findUnique({ where: { token } });
