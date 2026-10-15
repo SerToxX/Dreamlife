@@ -10,6 +10,7 @@ export interface CartItem {
   variante?: string;
   diseno?: string;
   qty: number;
+  stock: number;      // stock disponible al momento de agregar/actualizar
 }
 
 interface CartState {
@@ -34,9 +35,11 @@ export const useCartStore = create<CartState>()(
         set((s) => ({
           items: s.items.find((i) => i.id === item.id)
             ? s.items.map((i) =>
-                i.id === item.id ? { ...i, qty: i.qty + item.qty } : i,
+                i.id === item.id
+                  ? { ...i, stock: item.stock, qty: Math.min(i.qty + item.qty, item.stock) }
+                  : i,
               )
-            : [...s.items, item],
+            : [...s.items, { ...item, qty: Math.min(item.qty, item.stock) }],
         })),
 
       removeItem: (id) =>
@@ -46,7 +49,7 @@ export const useCartStore = create<CartState>()(
         set((s) => ({
           items: qty <= 0
             ? s.items.filter((i) => i.id !== id)
-            : s.items.map((i) => (i.id === id ? { ...i, qty } : i)),
+            : s.items.map((i) => (i.id === id ? { ...i, qty: Math.min(qty, i.stock ?? Infinity) } : i)),
         })),
 
       clear: () => set({ items: [], carritoId: null }),

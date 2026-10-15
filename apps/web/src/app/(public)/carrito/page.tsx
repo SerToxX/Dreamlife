@@ -44,7 +44,7 @@ export default function CarritoPage() {
                     <div className="flex items-center gap-1 border border-border rounded-md">
                       <button onClick={() => update(it.id, Math.max(1, it.qty - 1))} className="w-7 h-7 hover:bg-secondary"><Minus className="w-3 h-3 mx-auto" /></button>
                       <span className="w-8 text-center text-sm">{it.qty}</span>
-                      <button onClick={() => update(it.id, it.qty + 1)} className="w-7 h-7 hover:bg-secondary"><Plus className="w-3 h-3 mx-auto" /></button>
+                      <button onClick={() => update(it.id, Math.min(it.stock ?? Infinity, it.qty + 1))} disabled={it.qty >= (it.stock ?? Infinity)} className="w-7 h-7 hover:bg-secondary disabled:opacity-40 disabled:cursor-not-allowed"><Plus className="w-3 h-3 mx-auto" /></button>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-sm sm:text-base">{formatPrice(it.precio * it.qty)}</span>

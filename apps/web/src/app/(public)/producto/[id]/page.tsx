@@ -26,6 +26,7 @@ export default function ProductDetailPage() {
   });
 
   useEffect(() => { setActiveImg(0); }, [id]);
+  useEffect(() => { setQty(1); }, [selected, id]);
 
   const { data: poolProductos } = useQuery({
     queryKey: ['prod-recomendados-pool'],
@@ -43,14 +44,14 @@ export default function ProductDetailPage() {
   if (!prod) return <div className="container mx-auto py-24 text-center"><p className="text-muted-foreground">Producto no encontrado</p></div>;
 
   const currentItem = selected !== null ? prod.items?.[selected] : prod.items?.[0];
-  const stock = currentItem?.stocks?.reduce((a: number, s: any) => a + s.cantidad, 0) ?? 0;
+  const stock = currentItem?.stocks?.reduce((a: number, s: any) => a + (s.cantidad - s.reservado), 0) ?? 0;
   const imagenes = prod.imagenes ?? [];
   const imagen = imagenes[activeImg]?.url ?? imagenes[0]?.url;
   const { precioFinal, precioOriginal, oferta } = getPrecioConDescuento(prod.precioBase, currentItem?.ofertaItems);
 
   const handleAdd = () => {
-    if (!currentItem) { toast({ title: 'Selecciona una variante', variant: 'destructive' }); return; }
-    addItem({ id: currentItem.id, sku: currentItem.codigoSku, nombre: prod.nombre, precio: precioFinal, imagen, variante: currentItem.variante?.tamano, qty });
+    if (!currentItem || stock <= 0) { toast({ title: 'Sin stock disponible', variant: 'destructive' }); return; }
+    addItem({ id: currentItem.id, sku: currentItem.codigoSku, nombre: prod.nombre, precio: precioFinal, imagen, variante: currentItem.variante?.tamano, qty: Math.min(qty, stock), stock });
     toast({ title: 'Agregado al carrito', description: prod.nombre });
   };
 
@@ -137,7 +138,7 @@ export default function ProductDetailPage() {
             <div className="flex items-center gap-1 w-fit border border-border rounded-md">
               <button onClick={() => setQty(Math.max(1, qty - 1))} className="w-9 h-9 hover:bg-secondary">-</button>
               <span className="w-12 text-center">{qty}</span>
-              <button onClick={() => setQty(qty + 1)} className="w-9 h-9 hover:bg-secondary">+</button>
+              <button onClick={() => setQty(Math.min(stock, qty + 1))} disabled={qty >= stock} className="w-9 h-9 hover:bg-secondary disabled:opacity-40 disabled:cursor-not-allowed">+</button>
             </div>
             <p className="text-xs text-muted-foreground mt-1">{stock > 0 ? `${stock} disponibles` : 'Sin stock'}</p>
           </div>

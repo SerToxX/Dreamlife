@@ -14,13 +14,14 @@ export function ProductCard({ product }: Props) {
   const addItem = useCartStore((s) => s.addItem);
   const imagen = product.imagenes?.[0]?.url;
   const firstItem = product.items?.[0];
+  const stock = firstItem?.stocks?.reduce((a: number, s: any) => a + (s.cantidad - s.reservado), 0) ?? 0;
   const { precioFinal, precioOriginal, oferta } = getPrecioConDescuento(product.precioBase, firstItem?.ofertaItems);
 
   const handleAdd = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!firstItem) { toast({ title: 'Sin stock disponible', variant: 'destructive' }); return; }
-    addItem({ id: firstItem.id, sku: firstItem.codigoSku, nombre: product.nombre, precio: precioFinal, imagen, variante: firstItem.variante?.tamano, qty: 1 });
+    if (!firstItem || stock <= 0) { toast({ title: 'Sin stock disponible', variant: 'destructive' }); return; }
+    addItem({ id: firstItem.id, sku: firstItem.codigoSku, nombre: product.nombre, precio: precioFinal, imagen, variante: firstItem.variante?.tamano, qty: 1, stock });
     toast({ title: 'Agregado al carrito', description: product.nombre });
   };
 
@@ -50,7 +51,7 @@ export function ProductCard({ product }: Props) {
               {oferta && <span className="text-xs text-muted-foreground line-through">{formatPrice(precioOriginal)}</span>}
               <span className={`font-bold text-sm sm:text-base ${oferta ? 'text-accent-2' : ''}`}>{formatPrice(precioFinal)}</span>
             </div>
-            <Button size="icon" variant="outline" className="h-8 w-8 flex-shrink-0" onClick={handleAdd}>
+            <Button size="icon" variant="outline" className="h-8 w-8 flex-shrink-0" onClick={handleAdd} disabled={stock <= 0}>
               <ShoppingCart className="w-3.5 h-3.5" />
             </Button>
           </div>
