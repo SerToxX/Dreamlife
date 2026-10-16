@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { formatPrice, cn } from '@/lib/utils';
 import { toast } from '@/components/ui/toaster';
+import { ShippingSelector, type ZonaEnvio } from '@/components/features/checkout/shipping-selector';
 
 const TIPOS_DOCUMENTO = [
   { id: 'DNI', label: 'DNI' },
@@ -28,6 +29,7 @@ export default function CheckoutPage() {
   const { isAuthenticated, user, hydrated } = useAuthStore();
   const logout = useAuthStore((s) => s.logout);
   const [metodo, setMetodo] = useState('YAPE');
+  const [zona, setZona] = useState<ZonaEnvio | null>(null);
   const [form, setForm] = useState({
     nombre: '', correo: '', telefono: '',
     tipoDocumento: 'DNI', numeroDocumento: '',
@@ -63,11 +65,11 @@ export default function CheckoutPage() {
   }, [isAuthenticated, user]);
 
   const total = items.reduce((a, i) => a + i.precio * i.qty, 0);
-  const envio = total >= 199 ? 0 : 15;
+  const envio = zona ? Number(zona.precio) : 0;
 
   const camposCompletos = form.nombre.trim() && form.correo.trim() && form.telefono.trim()
     && form.numeroDocumento.trim() && form.direccion.trim() && form.distrito.trim()
-    && form.provincia.trim() && form.departamento.trim();
+    && form.provincia.trim() && form.departamento.trim() && !!zona;
 
   const datosPedido = () => ({
     items: items.map((i) => ({ itemId: i.id, cantidad: i.qty, precio: i.precio })),
@@ -82,6 +84,7 @@ export default function CheckoutPage() {
     departamento: form.departamento,
     referencia: form.referencia,
     notaCliente: form.notas,
+    zonaEnvioId: zona?.id,
   });
 
   const { mutate, isPending } = useMutation({
@@ -174,6 +177,9 @@ export default function CheckoutPage() {
               <div><label className="text-xs text-muted-foreground mb-1 block">Referencia (opcional)</label><Input value={form.referencia} onChange={(e) => setForm((p) => ({ ...p, referencia: e.target.value }))} placeholder="Frente al parque" /></div>
               <div className="sm:col-span-2"><label className="text-xs text-muted-foreground mb-1 block">Notas para el pedido (opcional)</label><Input value={form.notas} onChange={(e) => setForm((p) => ({ ...p, notas: e.target.value }))} /></div>
             </div>
+            <div className="mt-4">
+              <ShippingSelector value={zona} onChange={setZona} />
+            </div>
           </CardContent></Card>
 
           <Card><CardContent className="p-5">
@@ -207,7 +213,7 @@ export default function CheckoutPage() {
           </div>
           <div className="border-t border-border pt-3 space-y-1 text-sm">
             <div className="flex justify-between"><span className="text-muted-foreground">Subtotal</span><span>{formatPrice(total)}</span></div>
-            <div className="flex justify-between"><span className="text-muted-foreground">Envío</span><span>{envio === 0 ? 'Gratis' : formatPrice(envio)}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Envío</span><span>{!zona ? 'Selecciona zona' : envio === 0 ? 'Gratis' : formatPrice(envio)}</span></div>
             <div className="flex justify-between font-bold text-lg pt-2 border-t border-border"><span>Total</span><span>{formatPrice(total + envio)}</span></div>
           </div>
           {metodo === 'TARJETA' ? (
@@ -224,7 +230,7 @@ export default function CheckoutPage() {
           ) : (
             <Button variant="gradient" className="w-full mt-4 h-12 text-base" disabled={!camposCompletos || isPending} onClick={() => mutate()}>{isPending ? 'Procesando...' : 'Confirmar pedido'}</Button>
           )}
-          {!camposCompletos && <p className="text-[11px] text-muted-foreground text-center mt-2">Completa los campos marcados con * para continuar</p>}
+          {!camposCompletos && <p className="text-[11px] text-muted-foreground text-center mt-2">{!zona ? 'Selecciona tu zona de envío y completa los campos marcados con * para continuar' : 'Completa los campos marcados con * para continuar'}</p>}
         </CardContent></Card>
       </div>
     </div>

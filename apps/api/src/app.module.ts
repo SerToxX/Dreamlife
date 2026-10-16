@@ -22,6 +22,7 @@ import { CustomOrdersModule } from './modules/custom-orders/custom-orders.module
 import { SupportModule } from './modules/support/support.module';
 import { BackupModule } from './modules/backup/backup.module';
 import { SettingsModule } from './modules/settings/settings.module';
+import { ShippingModule } from './modules/shipping/shipping.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 
@@ -38,6 +39,7 @@ import { RolesGuard } from './common/guards/roles.guard';
     CustomersModule, PosModule, FinanceModule, MarketingModule,
     DashboardModule, ReportsModule, NotificationsModule,
     CustomOrdersModule, SupportModule, BackupModule, SettingsModule,
+    ShippingModule,
   ],
   providers: [
     // ── Seguridad "fail-safe": por defecto TODO endpoint nuevo requiere

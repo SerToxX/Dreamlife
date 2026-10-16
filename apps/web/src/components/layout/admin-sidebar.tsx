@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
-import { LayoutDashboard, Package, Warehouse, ShoppingBag, Users, BarChart2, DollarSign, Tag, Monitor, LogOut, Sparkles, MessageSquare, FolderTree, MapPin, Store, ShieldCheck, DatabaseBackup, FileText, Settings } from 'lucide-react';
+import { LayoutDashboard, Package, Warehouse, ShoppingBag, Users, BarChart2, DollarSign, Tag, Monitor, LogOut, Sparkles, MessageSquare, FolderTree, MapPin, Store, ShieldCheck, DatabaseBackup, FileText, Settings, Truck } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth.store';
 import { cn } from '@/lib/utils';
 import { toast } from '@/components/ui/toaster';
@@ -14,6 +14,7 @@ const LINKS = [
   { href: '/categorias', label: 'Categorías', icon: FolderTree, roles: ['admin'] },
   { href: '/inventario', label: 'Inventario', icon: Warehouse, roles: ['admin', 'worker'] },
   { href: '/ubicaciones', label: 'Ubicaciones', icon: MapPin, roles: ['admin'] },
+  { href: '/envios', label: 'Zonas de envío', icon: Truck, roles: ['admin'] },
   { href: '/pedidos', label: 'Pedidos', icon: ShoppingBag, roles: ['admin', 'worker'] },
   { href: '/pos', label: 'POS / Caja', icon: Monitor, roles: ['admin', 'worker'] },
   { href: '/clientes', label: 'Clientes', icon: Users, roles: ['admin', 'worker'] },

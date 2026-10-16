@@ -362,22 +362,48 @@ model Pago {
 }
 
 model Envio {
-  id           Int       @id @default(autoincrement())
+  id           Int        @id @default(autoincrement())
   ventaId      Int
-  venta        Venta     @relation(fields: [ventaId], references: [id], onDelete: Cascade)
-  tipo         String?   @db.VarChar(50)
-  tracking     String?   @db.VarChar(100)
-  estado       String?   @db.VarChar(50)
-  direccion    String?   @db.Text
-  distrito     String?   @db.VarChar(100)
-  provincia    String?   @db.VarChar(100)
-  departamento String?   @db.VarChar(100)
-  referencia   String?   @db.Text
+  venta        Venta      @relation(fields: [ventaId], references: [id], onDelete: Cascade)
+  tipo         String?    @db.VarChar(50)
+  tracking     String?    @db.VarChar(100)
+  estado       String?    @db.VarChar(50)
+  direccion    String?    @db.Text
+  distrito     String?    @db.VarChar(100)
+  provincia    String?    @db.VarChar(100)
+  departamento String?    @db.VarChar(100)
+  referencia   String?    @db.Text
+  zonaEnvioId  Int?
+  zonaEnvio    ZonaEnvio? @relation(fields: [zonaEnvioId], references: [id], onDelete: SetNull)
+  costo        Decimal    @default(0) @db.Decimal(10, 2)
   fechaEnvio   DateTime?
   fechaEntrega DateTime?
-  createdAt    DateTime  @default(now())
+  createdAt    DateTime   @default(now())
 
   @@map("envio")
+}
+
+// Zonas de envío configurables por el administrador: definen el costo de
+// envío según destino (zonas de Lima Metropolitana o departamentos de
+// provincia), mostradas en el checkout para que el cliente elija su zona.
+model ZonaEnvio {
+  id        Int           @id @default(autoincrement())
+  tipo      ZonaEnvioTipo
+  nombre    String        @db.VarChar(100)
+  cobertura String?       @db.Text
+  precio    Decimal       @default(0) @db.Decimal(10, 2)
+  activo    Boolean       @default(true)
+  orden     Int           @default(0)
+  envios    Envio[]
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@map("zona_envio")
+}
+
+enum ZonaEnvioTipo {
+  LIMA
+  PROVINCIA
 }
 
 // ─────────────────────────────────────────────

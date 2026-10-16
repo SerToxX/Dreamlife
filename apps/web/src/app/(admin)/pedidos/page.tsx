@@ -280,6 +280,9 @@ export default function PedidosPage() {
                 <div className="p-3 rounded-md border border-border">
                   <p className="text-xs text-muted-foreground mb-2 uppercase tracking-wider font-medium flex items-center gap-1.5"><Truck className="w-3.5 h-3.5" />Envío</p>
                   <p className="text-sm">{detailFull.envios[0].tipo ?? 'Delivery'} · {detailFull.envios[0].estado ?? 'Pendiente'}</p>
+                  {detailFull.envios[0].zonaEnvio && (
+                    <p className="text-xs text-muted-foreground mt-1">{detailFull.envios[0].zonaEnvio.nombre} · <span className="font-medium">{Number(detailFull.envios[0].costo) === 0 ? 'Gratis' : formatPrice(detailFull.envios[0].costo)}</span></p>
+                  )}
                   {detailFull.envios[0].direccion && (
                     <p className="text-xs text-muted-foreground mt-1.5 flex items-start gap-1.5">
                       <MapPin className="w-3 h-3 mt-0.5 flex-shrink-0" />

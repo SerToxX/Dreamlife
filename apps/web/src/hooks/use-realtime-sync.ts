@@ -14,6 +14,7 @@ const SYNCED_PREFIXES = [
   'orders', 'personalizados', 'ofertas', 'cupones',
   'admin-products', 'cats', 'categorias-admin',
   'ubicaciones', 'ubicaciones-admin', 'inv-stock', 'inv-historial', 'inv-all-items',
+  'zonas-envio-admin',
 ];
 
 /**

@@ -33,6 +33,8 @@ export function usePublicRealtimeSync() {
         // El descuento se refleja en el precio del catálogo/detalle también
         queryClient.invalidateQueries({ queryKey: ['products'] });
         queryClient.invalidateQueries({ queryKey: ['prod'] });
+      } else if (data?.scope === 'zonas-envio') {
+        queryClient.invalidateQueries({ queryKey: ['zonas-envio-pub'] });
       }
     };
 

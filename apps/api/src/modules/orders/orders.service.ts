@@ -47,7 +47,7 @@ export class OrdersService {
   async findOne(id: number) {
     const order = await this.prisma.venta.findUnique({
       where: { id },
-      include: { cliente: true, usuario: true, ubicacion: true, pagos: true, envios: true,
+      include: { cliente: true, usuario: true, ubicacion: true, pagos: true, envios: { include: { zonaEnvio: true } },
         detalles: { include: { item: { include: { producto: true, variante: true, imagenes: { take: 1 } } } } },
         pedidosPersonalizados: true },
     });

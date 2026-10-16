@@ -21,6 +21,9 @@ interface QuickCheckoutDto {
   departamento?: string;
   referencia?: string;
   notaCliente?: string;
+  // Zona de envío elegida (define el costo) — el precio NUNCA se confía del
+  // navegador, siempre se vuelve a buscar en la BD a partir de este id.
+  zonaEnvioId?: number;
 }
 
 const TIPOS_DOCUMENTO = ['DNI', 'CE', 'PASAPORTE', 'RUC'];
@@ -53,6 +56,10 @@ export class CheckoutService {
     if (!dto.distrito?.trim()) throw new BadRequestException('El distrito es obligatorio');
     if (!dto.provincia?.trim()) throw new BadRequestException('La provincia es obligatoria');
     if (!dto.departamento?.trim()) throw new BadRequestException('El departamento es obligatorio');
+    if (!dto.zonaEnvioId) throw new BadRequestException('Selecciona tu zona de envío');
+
+    const zona = await this.prisma.zonaEnvio.findUnique({ where: { id: Number(dto.zonaEnvioId) } });
+    if (!zona || !zona.activo) throw new BadRequestException('La zona de envío seleccionada ya no está disponible');
 
     const itemIds = dto.items.map(i => Number(i.itemId));
     const items = await this.prisma.productoItem.findMany({
@@ -94,13 +101,15 @@ export class CheckoutService {
       detallesData.push({ itemId: item.id, cantidad: req.cantidad, precioBase, precioVendido: precio });
     }
     total = Math.max(0, total - descuentoTotal);
+    const costoEnvio = Number(zona.precio);
+    total += costoEnvio;
 
     const trustedOrder = { total };
     if (!Number.isFinite(trustedOrder.total) || trustedOrder.total <= 0) {
       throw new BadRequestException('Monto de pedido inválido');
     }
 
-    return { detallesData, trustedOrder, descuentoTotal };
+    return { detallesData, trustedOrder, descuentoTotal, zona, costoEnvio };
   }
 
   // Quick checkout: acepta items directamente (sin necesidad de carrito en BD)
@@ -112,7 +121,7 @@ export class CheckoutService {
       throw new BadRequestException('El pago con tarjeta se procesa a través de Mercado Pago — usa /checkout/preferencia');
     }
 
-    const { detallesData, trustedOrder, descuentoTotal } = await this.validarYCalcular(dto);
+    const { detallesData, trustedOrder, descuentoTotal, zona, costoEnvio } = await this.validarYCalcular(dto);
 
     const venta = await this.prisma.$transaction(async (tx) => {
       const nuevaVenta = await tx.venta.create({
@@ -161,6 +170,8 @@ export class CheckoutService {
           provincia: dto.provincia!.trim(),
           departamento: dto.departamento!.trim(),
           referencia: dto.referencia?.trim() || null,
+          zonaEnvioId: zona.id,
+          costo: costoEnvio,
         },
       });
 
@@ -183,7 +194,7 @@ export class CheckoutService {
   // init_point; la venta se confirma después, cuando el pago esté aprobado
   // (ver confirmarPreferencia y confirmarPorPago).
   async crearPreferencia(dto: QuickCheckoutDto, clienteId: number) {
-    const { detallesData, trustedOrder, descuentoTotal } = await this.validarYCalcular(dto);
+    const { detallesData, trustedOrder, descuentoTotal, zona, costoEnvio } = await this.validarYCalcular(dto);
 
     const venta = await this.prisma.$transaction(async (tx) => {
       const nuevaVenta = await tx.venta.create({
@@ -218,6 +229,8 @@ export class CheckoutService {
           provincia: dto.provincia!.trim(),
           departamento: dto.departamento!.trim(),
           referencia: dto.referencia?.trim() || null,
+          zonaEnvioId: zona.id,
+          costo: costoEnvio,
         },
       });
 

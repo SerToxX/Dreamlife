@@ -308,6 +308,9 @@ export default function MisPedidosPage() {
                   <div className="p-3 rounded-md border border-border">
                     <p className="text-xs text-muted-foreground mb-1.5 uppercase tracking-wider font-medium flex items-center gap-1.5"><Truck className="w-3.5 h-3.5" />Envío</p>
                     <p className="text-sm">{detailVenta.envios[0].estado ?? 'Pendiente'}</p>
+                    {detailVenta.envios[0].zonaEnvio && (
+                      <p className="text-xs text-muted-foreground mt-1">{detailVenta.envios[0].zonaEnvio.nombre} · <span className="font-medium">{Number(detailVenta.envios[0].costo) === 0 ? 'Gratis' : formatPrice(detailVenta.envios[0].costo)}</span></p>
+                    )}
                     {detailVenta.envios[0].direccion && (
                       <p className="text-xs text-muted-foreground flex items-start gap-1 mt-1">
                         <MapPin className="w-3 h-3 mt-0.5 flex-shrink-0" />
