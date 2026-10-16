@@ -26,6 +26,8 @@ export function Footer() {
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li><Link href="/sobre-nosotros" className="hover:text-foreground">Sobre nosotros</Link></li>
               <li><Link href="/contacto" className="hover:text-foreground">Contacto</Link></li>
+              <li><Link href="/politica-de-devolucion" className="hover:text-foreground">Política de devolución</Link></li>
+              <li><Link href="/terminos-y-condiciones" className="hover:text-foreground">Términos y condiciones</Link></li>
               <li><Link href="/reclamaciones" className="hover:text-foreground flex items-center justify-center md:justify-start gap-1"><FileText className="w-3 h-3" />Libro de reclamaciones</Link></li>
             </ul>
           </div>
