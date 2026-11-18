@@ -60,7 +60,14 @@ export class MailService {
     text: string,
     attachment?: { filename: string; content: Buffer },
   ) {
-    if (!this.transporter) return;
+    if (!this.transporter) {
+      // Sin SMTP configurado no hay forma de reintentar ni de que el
+      // destinatario reciba el mensaje — para algo como un código de 2FA
+      // (que de otro modo se pierde sin dejar rastro) es importante que al
+      // menos quede en los logs del contenedor, visible para diagnosticar.
+      this.logger.warn(`SMTP no configurado — correo no enviado. To:${to} | ${subject}\n${text}`);
+      return;
+    }
     try {
       await this.transporter.sendMail({
         from: `"Dream Life — Web" <${process.env.SMTP_USER}>`,
@@ -71,8 +78,14 @@ export class MailService {
         html,
         attachments: attachment ? [{ filename: attachment.filename, content: attachment.content, contentType: 'application/pdf' }] : undefined,
       });
+      // Confirmación explícita de éxito — sin esto, un envío que sí funciona
+      // queda indistinguible de uno que nunca se intentó.
+      this.logger.log(`Correo enviado. To:${to} | ${subject}`);
     } catch (err) {
-      this.logger.error('Error enviando correo de notificación', err as Error);
+      // Mismo razonamiento que arriba: si la entrega real falla (SMTP mal
+      // configurado, credenciales vencidas, etc.) el contenido no debe
+      // perderse sin dejar rastro — crítico para un código de 2FA.
+      this.logger.error(`Error enviando correo. To:${to} | ${subject}\n${text}`, err as Error);
     }
   }
 
@@ -215,5 +228,23 @@ export class MailService {
       text,
       { filename: 'constancia-reclamo.pdf', content: pdf },
     );
+  }
+
+  // ── Código de verificación (login 2FA, activación 2FA, o confirmar correo al registrarse) ──
+  async sendTwoFactorCode(to: string, nombre: string, codigo: string, purpose: 'login' | 'enable' | 'register') {
+    const copy = {
+      login: { intro: 'Alguien (probablemente vos) está iniciando sesión en tu cuenta de Dream Life.', title: 'Tu código de inicio de sesión', subject: 'Tu código de verificación — Dream Life' },
+      enable: { intro: 'Estás activando la verificación en dos pasos en tu cuenta de Dream Life.', title: 'Confirmá la activación de 2FA', subject: 'Confirmá la verificación en dos pasos — Dream Life' },
+      register: { intro: '¡Bienvenido a Dream Life! Confirmá tu correo para activar tu cuenta.', title: 'Confirmá tu correo', subject: 'Confirmá tu correo — Dream Life' },
+    }[purpose];
+    const html = this.layout(
+      'Verificación',
+      copy.title,
+      [{ label: 'Código', value: `<span style="font-size:20px;font-weight:700;letter-spacing:2px;">${codigo}</span>` }],
+      'Detalle',
+      `${this.esc(copy.intro)}<br><br>Vence en 10 minutos. Si no fuiste vos, ignorá este correo y considerá cambiar tu contraseña.`,
+    );
+    const text = `Hola ${nombre},\n\n${copy.intro}\n\nTu código de verificación es:\n\n  ${codigo}\n\nVence en 10 minutos. Si no fuiste vos, ignorá este correo y considerá cambiar tu contraseña.\n\n— Dream Life`;
+    await this.send(to, copy.subject, to, html, text);
   }
 }

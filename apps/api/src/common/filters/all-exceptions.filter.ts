@@ -15,8 +15,17 @@ function mensajePrisma(exception: Prisma.PrismaClientKnownRequestError): { statu
   switch (exception.code) {
     case 'P2000':
       return { status: HttpStatus.BAD_REQUEST, message: 'Uno de los datos enviados es demasiado largo para guardarse' };
-    case 'P2002':
-      return { status: HttpStatus.CONFLICT, message: `Ya existe un registro con ese ${(exception.meta?.target as string[])?.join(', ') ?? 'valor'}` };
+    case 'P2002': {
+      // meta.target viene como string[] en algunos motores/versiones de
+      // Prisma y como string plano (nombre del índice) en otros — con MySQL
+      // y Prisma 5.22 acá llega como string. Sin este chequeo, `.join` sobre
+      // un string tira TypeError *dentro del propio exception filter*, lo
+      // que no lo atrapa nadie y tumba el proceso entero de Node (502/503
+      // para todos los usuarios hasta que el contenedor reinicia solo).
+      const target = exception.meta?.target;
+      const campos = Array.isArray(target) ? target.join(', ') : (target as string | undefined) ?? 'valor';
+      return { status: HttpStatus.CONFLICT, message: `Ya existe un registro con ese ${campos}` };
+    }
     case 'P2025':
       return { status: HttpStatus.NOT_FOUND, message: 'El registro no existe o ya fue eliminado' };
     case 'P2003':

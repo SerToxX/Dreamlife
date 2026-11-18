@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Logo } from '@/components/brand/logo';
 import { ThemeToggle } from '@/components/shared/theme-toggle';
+import { TwoFactorStep } from '@/components/shared/two-factor-step';
 import { toast } from '@/components/ui/toaster';
 import { STORE_URL } from '@/lib/urls';
 
@@ -18,6 +19,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [challengeId, setChallengeId] = useState<string | null>(null);
   // Se calcula tras montar (no en el primer render) para evitar mismatch de
   // hidratación: el servidor no conoce el hostname real del navegador.
   const [isAdminSubdomain, setIsAdminSubdomain] = useState(false);
@@ -36,7 +38,8 @@ export default function LoginPage() {
         // En admin.dreamlifeperu.com solo se permite login de admin/trabajador.
         // No se intenta login de cliente aquí: una cuenta de cliente debe fallar
         // directamente, no autenticarse y recién ahí ser rebotada.
-        await login(correo, password, true);
+        const result = await login(correo, password, true);
+        if (result.requires2FA) { setChallengeId(result.challengeId); return; }
         toast({ title: '¡Bienvenido al panel administrativo!' });
         router.push('/dashboard');
         return;
@@ -44,7 +47,8 @@ export default function LoginPage() {
 
       // Fuera del subdominio admin: SOLO se permite login de cliente.
       // Un admin/trabajador debe ir a admin.dreamlifeperu.com/login a autenticarse.
-      await login(correo, password, false);
+      const result = await login(correo, password, false);
+      if (result.requires2FA) { setChallengeId(result.challengeId); return; }
       toast({ title: '¡Bienvenido!' });
       router.push('/');
     } catch {
@@ -52,6 +56,11 @@ export default function LoginPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handle2FASuccess = () => {
+    toast({ title: isAdminSubdomain ? '¡Bienvenido al panel administrativo!' : '¡Bienvenido!' });
+    router.push(isAdminSubdomain ? '/dashboard' : '/');
   };
 
   return (
@@ -73,6 +82,10 @@ export default function LoginPage() {
             <h1 className="text-2xl font-bold">Iniciar sesión</h1>
             <p className="text-sm text-muted-foreground mt-1">Accede a tu cuenta de Dream Life</p>
           </div>
+          {challengeId ? (
+            <TwoFactorStep challengeId={challengeId} correo={correo} onSuccess={handle2FASuccess} onBack={() => setChallengeId(null)} />
+          ) : (
+          <>
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <div>
               <label className="text-xs text-muted-foreground mb-1.5 block">Correo electrónico</label>
@@ -99,6 +112,8 @@ export default function LoginPage() {
               <Store className="w-3.5 h-3.5" />Continuar como invitado a la tienda
             </Link>
           </div>
+          </>
+          )}
         </div>
       </div>
     </div>

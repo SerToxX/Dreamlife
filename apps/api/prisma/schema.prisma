@@ -40,6 +40,7 @@ model Usuario {
   ajustes     AjusteStock[]
   refreshTokens RefreshToken[]
   backups     Backup[]
+  twoFactorEnabled Boolean   @default(false)
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 
@@ -73,6 +74,11 @@ model Cliente {
   ventas      Venta[]
   pedidosPersonalizados PedidoPersonalizado[]
   clienteRefreshTokens ClienteRefreshToken[]
+  twoFactorEnabled Boolean           @default(false)
+  // Se activa al confirmar el código que se manda por correo al registrarse.
+  // No bloquea el login — el cliente puede usar la cuenta antes de verificar,
+  // queda visible en "Mi perfil" con opción de reenviar el código.
+  emailVerified Boolean              @default(false)
   createdAt   DateTime              @default(now())
   updatedAt   DateTime              @updatedAt
 
@@ -88,6 +94,44 @@ model ClienteRefreshToken {
   createdAt  DateTime @default(now())
 
   @@map("cliente_refresh_token")
+}
+
+// ─────────────────────────────────────────────
+// VERIFICACIÓN EN DOS PASOS (2FA por correo, opt-in)
+// ─────────────────────────────────────────────
+
+// `userType` + `userId` en vez de una FK directa porque el mismo mecanismo
+// sirve tanto para Usuario (staff) como para Cliente — son dos tablas
+// distintas sin relación polimórfica nativa en Prisma. Mismo patrón que
+// RefreshToken/ClienteRefreshToken ya separados por tipo de cuenta.
+model TwoFactorChallenge {
+  id         String    @id @default(cuid())
+  userType   String    @db.VarChar(10) // "usuario" | "cliente" — coincide con Usuario.rol.type / payload.type del JWT
+  userId     Int
+  purpose    String    @db.VarChar(10) // "login" (verificar para iniciar sesión) | "enable" (confirmar activación)
+  codeHash   String    @db.VarChar(255)
+  attempts   Int       @default(0)
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([userType, userId])
+  @@map("two_factor_challenge")
+}
+
+// Dispositivo recordado: al verificar el código una vez, el usuario puede
+// elegir no volver a pedírselo en ese mismo dispositivo por 30 días.
+model TrustedDevice {
+  id         Int      @id @default(autoincrement())
+  userType   String   @db.VarChar(10)
+  userId     Int
+  tokenHash  String   @unique @db.VarChar(64)
+  userAgent  String?  @db.Text
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+
+  @@index([userType, userId])
+  @@map("trusted_device")
 }
 
 // ─────────────────────────────────────────────

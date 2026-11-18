@@ -11,15 +11,35 @@ interface User {
   type: 'usuario' | 'cliente';
 }
 
+// Resultado de login() — o entra directo, o el backend pide el código de 2FA
+// (cuenta con la verificación activada y este dispositivo no está recordado).
+type LoginResult = { requires2FA: true; challengeId: string } | { requires2FA: false };
+
 interface AuthState {
   user: User | null;
   accessToken: string | null;
   isAuthenticated: boolean;
   hydrated: boolean;
-  login: (correo: string, contrasena: string, isAdmin?: boolean) => Promise<void>;
-  register: (data: { nombre: string; apellido?: string; dni?: string; correo: string; contrasena: string; telefono?: string; direccion?: string }) => Promise<void>;
+  login: (correo: string, contrasena: string, isAdmin?: boolean) => Promise<LoginResult>;
+  verify2FA: (challengeId: string, code: string, rememberDevice: boolean) => Promise<void>;
+  // Devuelve el challengeId del código de confirmación de correo que se
+  // manda al registrarse (null si por algún motivo no se pudo generar).
+  register: (data: { nombre: string; apellido?: string; dni?: string; correo: string; contrasena: string; telefono?: string; direccion?: string }) => Promise<string | null>;
+  verifyEmail: (challengeId: string, code: string) => Promise<void>;
+  resendEmailVerification: () => Promise<string | null>;
   logout: () => Promise<void>;
   setHydrated: () => void;
+}
+
+function applySession(data: any, set: (partial: Partial<AuthState>) => void) {
+  setCookie('access_token', data.accessToken);
+  setCookie('refresh_token', data.refreshToken);
+  // deviceToken solo viene cuando el usuario tildó "recordar este
+  // dispositivo" al verificar el código — se guarda (30 días) para que el
+  // próximo login en este mismo navegador no vuelva a pedirlo.
+  if (data.deviceToken) setCookie('device_token', data.deviceToken, 60 * 60 * 24 * 30);
+  const payload = JSON.parse(atob(data.accessToken.split('.')[1]));
+  set({ accessToken: data.accessToken, user: { id: payload.sub, correo: payload.correo, rol: payload.rol, type: payload.type }, isAuthenticated: true });
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -31,18 +51,31 @@ export const useAuthStore = create<AuthState>()(
       hydrated: false,
 
       login: async (correo, contrasena, isAdmin = false) => {
-        const { data } = await api.post(isAdmin ? '/auth/login/admin' : '/auth/login', { correo, contrasena });
-        if (typeof window !== 'undefined') {
-          setCookie('access_token', data.accessToken);
-          setCookie('refresh_token', data.refreshToken);
-        }
-        const payload = JSON.parse(atob(data.accessToken.split('.')[1]));
-        set({ accessToken: data.accessToken, user: { id: payload.sub, correo: payload.correo, rol: payload.rol, type: payload.type }, isAuthenticated: true });
+        const deviceToken = typeof window !== 'undefined' ? getCookie('device_token') || undefined : undefined;
+        const { data } = await api.post(isAdmin ? '/auth/login/admin' : '/auth/login', { correo, contrasena, deviceToken });
+        if (data.requires2FA) return { requires2FA: true, challengeId: data.challengeId };
+        if (typeof window !== 'undefined') applySession(data, set);
+        return { requires2FA: false };
+      },
+
+      verify2FA: async (challengeId, code, rememberDevice) => {
+        const { data } = await api.post('/auth/2fa/verify', { challengeId, code, rememberDevice });
+        if (typeof window !== 'undefined') applySession(data, set);
       },
 
       register: async (data) => {
-        await api.post('/auth/register', data);
+        const { data: res } = await api.post('/auth/register', data);
         await get().login(data.correo, data.contrasena, false);
+        return res.verifyChallengeId ?? null;
+      },
+
+      verifyEmail: async (challengeId, code) => {
+        await api.post('/auth/verify-email', { challengeId, code });
+      },
+
+      resendEmailVerification: async () => {
+        const { data } = await api.post('/auth/verify-email/resend');
+        return data.challengeId ?? null;
       },
 
       logout: async () => {

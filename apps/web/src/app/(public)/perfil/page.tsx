@@ -10,6 +10,8 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { toast } from '@/components/ui/toaster';
 import { PageHero } from '@/components/shared/page-hero';
+import { TwoFactorSettings } from '@/components/shared/two-factor-settings';
+import { EmailVerifyBanner } from '@/components/shared/email-verify-banner';
 
 export default function PerfilPage() {
   const router = useRouter();
@@ -109,6 +111,8 @@ export default function PerfilPage() {
           </div>
         </CardContent>
       </Card>
+
+      <div className="mt-6"><EmailVerifyBanner /><TwoFactorSettings /></div>
       </div>
     </div>
   );

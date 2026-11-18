@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Logo } from '@/components/brand/logo';
 import { ThemeToggle } from '@/components/shared/theme-toggle';
 import { toast } from '@/components/ui/toaster';
+import { EmailVerifyStep } from '@/components/shared/email-verify-step';
 
 export default function RegistroPage() {
   const router = useRouter();
@@ -16,6 +17,7 @@ export default function RegistroPage() {
   const [form, setForm] = useState({ nombre: '', apellido: '', dni: '', correo: '', contrasena: '', telefono: '', direccion: '' });
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [verifyChallengeId, setVerifyChallengeId] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,8 +27,11 @@ export default function RegistroPage() {
     }
     setLoading(true);
     try {
-      await register(form);
+      const challengeId = await register(form);
       toast({ title: '¡Bienvenido a Dream Life!' });
+      // La cuenta ya queda creada y con sesión iniciada — el paso de
+      // confirmar correo es un extra, no bloquea el acceso.
+      if (challengeId) { setVerifyChallengeId(challengeId); return; }
       router.push('/');
     } catch (err: any) {
       toast({ title: 'Error al registrarse', description: err.response?.data?.message ?? 'Intenta de nuevo', variant: 'destructive' });
@@ -54,6 +59,9 @@ export default function RegistroPage() {
             <p className="text-sm text-muted-foreground mt-1">Únete a la comunidad Dream Life</p>
           </div>
 
+          {verifyChallengeId ? (
+            <EmailVerifyStep challengeId={verifyChallengeId} correo={form.correo} onSuccess={() => router.push('/')} onSkip={() => router.push('/')} />
+          ) : (
           <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="text-xs text-muted-foreground mb-1.5 block">Nombres *</label>
@@ -95,7 +103,9 @@ export default function RegistroPage() {
               <Button type="submit" variant="gradient" size="lg" className="h-12 w-full mt-2" disabled={loading}>{loading ? 'Creando cuenta...' : 'Crear cuenta'}</Button>
             </div>
           </form>
+          )}
 
+          {!verifyChallengeId && (
           <div className="text-center mt-6 pt-6 border-t border-border">
             <p className="text-sm text-muted-foreground">
               ¿Ya tienes cuenta? <Link href="/login" className="text-foreground hover:underline font-medium">Inicia sesión</Link>
@@ -104,6 +114,7 @@ export default function RegistroPage() {
               <Store className="w-3.5 h-3.5" />Continuar como invitado a la tienda
             </Link>
           </div>
+          )}
         </div>
       </div>
     </div>

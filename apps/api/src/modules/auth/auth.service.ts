@@ -9,12 +9,14 @@ import * as bcrypt from 'bcryptjs';
 import { LoginDto } from './dto/login.dto';
 import { RegisterClienteDto } from './dto/register-cliente.dto';
 import { revalidateWebPath } from '../../common/utils/revalidate.util';
+import { TwoFactorService } from '../two-factor/two-factor.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     private prisma: PrismaService,
     private jwt: JwtService,
+    private twoFactor: TwoFactorService,
   ) {}
 
   // ── Login de usuario interno (admin / worker) ──────────
@@ -26,6 +28,11 @@ export class AuthService {
     if (!user || !user.activo) throw new UnauthorizedException('Credenciales inválidas');
     const valid = await bcrypt.compare(dto.contrasena, user.contrasena);
     if (!valid) throw new UnauthorizedException('Credenciales inválidas');
+
+    if (user.twoFactorEnabled && !(await this.twoFactor.isDeviceTrusted('usuario', user.id, dto.deviceToken))) {
+      const challengeId = await this.twoFactor.createChallenge('usuario', user.id, user.correo, user.nombre, 'login');
+      return { requires2FA: true, challengeId };
+    }
 
     return this.generateTokens({ sub: user.id, correo: user.correo, rol: user.rol.nombre, type: 'usuario' });
   }
@@ -39,7 +46,30 @@ export class AuthService {
     const valid = await bcrypt.compare(dto.contrasena, cliente.contrasena);
     if (!valid) throw new UnauthorizedException('Credenciales inválidas');
 
+    if (cliente.twoFactorEnabled && !(await this.twoFactor.isDeviceTrusted('cliente', cliente.id, dto.deviceToken))) {
+      const challengeId = await this.twoFactor.createChallenge('cliente', cliente.id, cliente.correo, cliente.nombre, 'login');
+      return { requires2FA: true, challengeId };
+    }
+
     return this.generateClienteTokens({ sub: cliente.id, correo: cliente.correo, rol: 'customer', type: 'cliente' });
+  }
+
+  // Segundo paso del login cuando loginUsuario/loginCliente devolvió
+  // requires2FA: el cliente manda el código que recibió por correo. Si es
+  // válido, recién acá se emiten los tokens — igual que un login normal, más
+  // "recordar este dispositivo" opcional.
+  async verifyLogin2FA(challengeId: string, code: string, rememberDevice: boolean, userAgent?: string) {
+    const { userType, userId } = await this.twoFactor.verifyChallenge(challengeId, code, 'login');
+    const deviceToken = rememberDevice ? await this.twoFactor.trustDevice(userType, userId, userAgent) : undefined;
+
+    if (userType === 'cliente') {
+      const cliente = await this.prisma.cliente.findUniqueOrThrow({ where: { id: userId } });
+      const tokens = await this.generateClienteTokens({ sub: cliente.id, correo: cliente.correo, rol: 'customer', type: 'cliente' });
+      return { ...tokens, deviceToken };
+    }
+    const user = await this.prisma.usuario.findUniqueOrThrow({ where: { id: userId }, include: { rol: true } });
+    const tokens = await this.generateTokens({ sub: user.id, correo: user.correo, rol: user.rol.nombre, type: 'usuario' });
+    return { ...tokens, deviceToken };
   }
 
   // ── Registro de cliente ────────────────────────────────
@@ -57,7 +87,11 @@ export class AuthService {
       data: {
         nombre: dto.nombre,
         apellido: dto.apellido,
-        dni: dto.dni,
+        // NULL, no '' — la columna es única y MySQL sí permite varios NULL,
+        // pero no varios '' repetidos. Con '' literal, el primer cliente que
+        // deja el DNI en blanco "ocupa" ese valor y cualquier otro que haga
+        // lo mismo después choca contra una unique constraint real.
+        dni: dto.dni || null,
         correo: dto.correo,
         telefono: dto.telefono,
         direccion: dto.direccion,
@@ -67,8 +101,39 @@ export class AuthService {
 
     revalidateWebPath('/sobre-nosotros');
 
+    // No bloquea el registro — la cuenta queda usable de inmediato, el
+    // código de confirmación se manda aparte y se puede reenviar después.
+    const verifyChallengeId = await this.twoFactor.createChallenge('cliente', cliente.id, cliente.correo, cliente.nombre, 'register');
+
     const { contrasena, ...result } = cliente;
-    return result;
+    return { ...result, verifyChallengeId };
+  }
+
+  // Confirma el código que llegó al registrarse. Pública (sin guard) porque
+  // el frontend la llama justo después de registrar, con el challengeId que
+  // devolvió registerCliente, no con el JWT.
+  async verifyEmail(challengeId: string, code: string) {
+    const { userType, userId } = await this.twoFactor.verifyChallenge(challengeId, code, 'register');
+    if (userType !== 'cliente') throw new UnauthorizedException('Código inválido o vencido');
+    await this.prisma.cliente.update({ where: { id: userId }, data: { emailVerified: true } });
+    return { verified: true };
+  }
+
+  // Reenvío — requiere sesión (se usa desde "Mi perfil" si el código original venció).
+  async resendEmailVerification(clienteId: number) {
+    const cliente = await this.prisma.cliente.findUniqueOrThrow({ where: { id: clienteId } });
+    if (cliente.emailVerified) return { alreadyVerified: true };
+    const challengeId = await this.twoFactor.createChallenge('cliente', cliente.id, cliente.correo, cliente.nombre, 'register');
+    return { challengeId };
+  }
+
+  // Estado actual — lo consulta "Mi perfil" vía React Query, mismo patrón
+  // que /auth/2fa/status, en vez de confiar en el JWT (que no lleva este
+  // campo y quedaría desactualizado hasta el próximo refresh).
+  async emailVerificationStatus(userType: 'usuario' | 'cliente', userId: number) {
+    if (userType !== 'cliente') return { verified: true, correo: null };
+    const cliente = await this.prisma.cliente.findUniqueOrThrow({ where: { id: userId } });
+    return { verified: cliente.emailVerified, correo: cliente.correo };
   }
 
   // ── Refresh token ──────────────────────────────────────
