@@ -2,6 +2,7 @@ import { Injectable, BadRequestException, ForbiddenException, NotFoundException 
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotificationsGateway } from '../notifications/notifications.gateway';
+import { CLIENTE_SAFE_SELECT } from '../../common/prisma/safe-select';
 
 interface ItemPersonalizadoInput {
   tipo?: string;
@@ -33,7 +34,7 @@ export class CustomOrdersService {
 
   findAll() {
     return this.prisma.pedidoPersonalizado.findMany({
-      include: { cliente: true },
+      include: { cliente: { select: CLIENTE_SAFE_SELECT } },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -48,7 +49,7 @@ export class CustomOrdersService {
   findOne(id: number) {
     return this.prisma.pedidoPersonalizado.findUnique({
       where: { id },
-      include: { cliente: true },
+      include: { cliente: { select: CLIENTE_SAFE_SELECT } },
     });
   }
 

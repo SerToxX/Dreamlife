@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotificationsGateway } from '../notifications/notifications.gateway';
+import { CLIENTE_SAFE_SELECT, USUARIO_SAFE_SELECT } from '../../common/prisma/safe-select';
 
 @Injectable()
 export class OrdersService {
@@ -18,7 +19,7 @@ export class OrdersService {
       where,
       skip: (page - 1) * limit,
       take: limit,
-      include: { cliente: true, usuario: true, ubicacion: true, pagos: true, detalles: { include: { item: { include: { producto: true } } } } },
+      include: { cliente: { select: CLIENTE_SAFE_SELECT }, usuario: { select: USUARIO_SAFE_SELECT }, ubicacion: true, pagos: true, detalles: { include: { item: { include: { producto: true } } } } },
       orderBy: { createdAt: 'desc' },
     });
 
@@ -32,7 +33,7 @@ export class OrdersService {
       ? []
       : await this.prisma.pedidoPersonalizado.findMany({
           where: personalizadosWhere,
-          include: { cliente: true },
+          include: { cliente: { select: CLIENTE_SAFE_SELECT } },
           orderBy: { createdAt: 'desc' },
         });
 
@@ -47,7 +48,7 @@ export class OrdersService {
   async findOne(id: number) {
     const order = await this.prisma.venta.findUnique({
       where: { id },
-      include: { cliente: true, usuario: true, ubicacion: true, pagos: true, envios: { include: { zonaEnvio: true } },
+      include: { cliente: { select: CLIENTE_SAFE_SELECT }, usuario: { select: USUARIO_SAFE_SELECT }, ubicacion: true, pagos: true, envios: { include: { zonaEnvio: true } },
         detalles: { include: { item: { include: { producto: true, variante: true, imagenes: { take: 1 } } } } },
         pedidosPersonalizados: true },
     });

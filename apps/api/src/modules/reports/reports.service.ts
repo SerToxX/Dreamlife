@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { FinanceService } from '../finance/finance.service';
 import { ExcelService } from '../../common/excel/excel.service';
+import { CLIENTE_SAFE_SELECT } from '../../common/prisma/safe-select';
 
 @Injectable()
 export class ReportsService {
@@ -10,7 +11,7 @@ export class ReportsService {
   getSales(from: Date, to: Date) {
     return this.prisma.venta.findMany({
       where: { createdAt: { gte: from, lte: to }, estado: { notIn: ['CANCELADO'] } },
-      include: { cliente: true, detalles: { include: { item: { include: { producto: true } } } }, pagos: true, ubicacion: true },
+      include: { cliente: { select: CLIENTE_SAFE_SELECT }, detalles: { include: { item: { include: { producto: true } } } }, pagos: true, ubicacion: true },
       orderBy: { createdAt: 'desc' },
     });
   }

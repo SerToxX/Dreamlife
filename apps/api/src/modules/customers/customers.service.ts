@@ -39,6 +39,10 @@ export class CustomersService {
       if (dup && dup.id !== id) throw new ConflictException('Ya existe una cuenta registrada con ese DNI');
     }
 
-    return this.prisma.cliente.update({ where: { id }, data: allowed });
+    return this.prisma.cliente.update({
+      where: { id },
+      data: allowed,
+      select: { id: true, nombre: true, apellido: true, dni: true, correo: true, telefono: true, direccion: true, puntos: true, nivel: true, activo: true, createdAt: true },
+    });
   }
 }
