@@ -41,8 +41,8 @@ services:
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
       CORS_ORIGINS: ${CORS_ORIGINS:-}
       REVALIDATE_SECRET: ${REVALIDATE_SECRET:-}
-      THROTTLE_TTL: 60000
-      THROTTLE_LIMIT: 100
+      THROTTLE_TTL: ${THROTTLE_TTL:-60000}
+      THROTTLE_LIMIT: ${THROTTLE_LIMIT:-100}
       TZ: America/Lima
       BACKUP_DIR: /app/backups
       SMTP_HOST: ${SMTP_HOST:-}
